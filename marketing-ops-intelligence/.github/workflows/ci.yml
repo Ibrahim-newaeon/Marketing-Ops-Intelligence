@@ -136,3 +136,97 @@ jobs:
           tags: moi:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  live-smoke:
+    # Catches Anthropic SDK / prompt-caching / tool-use / model-routing
+    # regressions the moment they land. Runs phases 0-4 end-to-end
+    # (client resolve -> memory -> 4 research -> 3 planning -> approval
+    # validation) for a single market with stop_after_plan=true, so
+    # WhatsApp and the 48h timer do NOT fire.
+    #
+    # Skipped automatically on forks / PRs from outside contributors
+    # (no access to the ANTHROPIC_API_KEY secret).
+    name: Live pipeline smoke
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
+    defaults:
+      run:
+        working-directory: marketing-ops-intelligence
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: marketing_ops
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/marketing_ops
+      JWT_SECRET: ci-live-smoke-secret-padding-to-meet-the-32-char-minimum
+      WA_PHONE_NUMBER_ID: ci-fake
+      WA_ACCESS_TOKEN: ci-fake
+      WA_APP_SECRET: ci-fake
+      WA_WEBHOOK_VERIFY_TOKEN: ci-fake
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: "${{ env.PNPM_VERSION }}" }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+          cache-dependency-path: marketing-ops-intelligence/pnpm-lock.yaml
+      - name: Guard — require API key secret
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::ANTHROPIC_API_KEY not set — skipping live smoke."
+            echo "SKIP=true" >> $GITHUB_ENV
+          fi
+      - run: pnpm install --frozen-lockfile
+        if: env.SKIP != 'true'
+      - run: pnpm run db:migrate
+        if: env.SKIP != 'true'
+      - run: pnpm run memory:seed
+        if: env.SKIP != 'true'
+      - name: Stage CI client profile
+        if: env.SKIP != 'true'
+        run: cp tests/playwright/fixtures/clients/test-gulf.json config/clients/ci-smoke.json && sed -i 's/"test-gulf"/"ci-smoke"/' config/clients/ci-smoke.json
+      - name: Boot server
+        if: env.SKIP != 'true'
+        run: pnpm tsx core/server/index.ts > server.log 2>&1 &
+      - name: Wait for /api/health
+        if: env.SKIP != 'true'
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/api/health > /dev/null; then
+              echo "server up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::server never came up"
+          cat server.log
+          exit 1
+      - name: Run pipeline (phases 0-4, single market, stop_after_plan)
+        if: env.SKIP != 'true'
+        run: |
+          TOKEN=$(node -e "console.log(require('jsonwebtoken').sign({sub:'1',kind:'access',preferred_language:'ar'}, process.env.JWT_SECRET, {algorithm:'HS256',expiresIn:'15m'}))")
+          RESP=$(curl -sf -X POST http://localhost:3000/api/pipeline/run \
+            -H "authorization: Bearer $TOKEN" \
+            -H "content-type: application/json" \
+            -d '{"client_id":"ci-smoke","markets_override":["SA"],"stop_after_plan":true,"total_budget_usd_override":5000}')
+          echo "$RESP"
+          STATUS=$(echo "$RESP" | node -e "let s=''; process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s); process.stdout.write(j.status||''); process.exit(j.status==='awaiting_approval'?0:1);})")
+      - name: Dump audit log on success
+        if: env.SKIP != 'true' && success()
+        run: tail -30 memory/audit_log.jsonl
+      - name: Dump server log on failure
+        if: env.SKIP != 'true' && failure()
+        run: cat server.log

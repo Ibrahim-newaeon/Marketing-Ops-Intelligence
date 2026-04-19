@@ -19,6 +19,7 @@
     "db:seed": "tsx core/db/seed.ts",
     "memory:seed": "tsx core/utils/memory_seed.ts",
     "memory:backfill": "tsx core/memory/backfill_embeddings.ts",
+    "cost:report": "tsx core/utils/cost_report.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p dashboards/tsconfig.json --noEmit",
     "test:unit": "vitest run",
