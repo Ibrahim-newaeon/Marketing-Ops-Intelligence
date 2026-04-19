@@ -22,7 +22,7 @@ export default async function OverviewPage(): Promise<JSX.Element> {
     if ("status" in tab && tab.status === "empty") {
       return <EmptyTab tab="overview" justification={tab.reason} />;
     }
-    const section = tab as { status: string; data: OverviewData; justification: string | null };
+    const section = tab as unknown as { status: string; data: OverviewData; justification: string | null };
     if (section.status === "empty_justified") {
       return <EmptyTab tab="overview" justification={section.justification ?? "unknown"} />;
     }

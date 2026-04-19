@@ -20,15 +20,16 @@
     "memory:seed": "tsx core/utils/memory_seed.ts",
     "memory:backfill": "tsx core/memory/backfill_embeddings.ts",
     "lint": "eslint . --ext .ts,.tsx",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p dashboards/tsconfig.json --noEmit",
     "test:unit": "vitest run",
     "test:playwright": "playwright test",
     "test:k6": "k6 run tests/k6/concurrent_multi_market.js && k6 run tests/k6/memory_retrieval_latency.js && k6 run tests/k6/dashboard_aggregation_load.js",
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.30.0",
+    "@anthropic-ai/sdk": "^0.90.0",
     "axios": "^1.7.7",
+    "clsx": "^2.1.1",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "express-rate-limit": "^7.4.1",

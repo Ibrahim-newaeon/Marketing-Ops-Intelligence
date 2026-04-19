@@ -18,10 +18,10 @@ import { query } from "../db/client";
 export interface SendOptions {
   template: TemplateName;
   run_id: string;
-  event?: string;
-  params?: string[];
-  to?: string;
-  lang?: "ar" | "en";
+  event?: string | undefined;
+  params?: string[] | undefined;
+  to?: string | undefined;
+  lang?: "ar" | "en" | undefined;
 }
 
 export interface SendResult {
@@ -71,10 +71,9 @@ export async function sendWhatsApp(opts: SendOptions): Promise<SendResult> {
     template: {
       name: opts.template,
       language: { code: lang },
-      components:
-        body_params.length > 0
-          ? [{ type: "body", parameters: body_params }]
-          : undefined,
+      ...(body_params.length > 0
+        ? { components: [{ type: "body" as const, parameters: body_params }] }
+        : {}),
     },
     biz_opaque_callback_data: eid,
   };

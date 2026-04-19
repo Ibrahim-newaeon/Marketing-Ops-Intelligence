@@ -3,6 +3,7 @@
   "compilerOptions": {
     "jsx": "preserve",
     "plugins": [{ "name": "next" }],
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
       "@schemas/*": ["../core/schemas/*"]

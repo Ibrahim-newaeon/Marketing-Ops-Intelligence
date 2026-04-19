@@ -39,10 +39,10 @@ const CLIENTS_DIR = path.join(ROOT, "config", "clients");
 
 export interface RunOptions {
   client_id: string;
-  markets_override?: string[];
-  total_budget_usd_override?: number;
-  run_label?: string;
-  stop_after_plan?: boolean;   // /generate_plan_only
+  markets_override?: string[] | undefined;
+  total_budget_usd_override?: number | undefined;
+  run_label?: string | undefined;
+  stop_after_plan?: boolean | undefined;   // /generate_plan_only
 }
 
 export interface RunResult {

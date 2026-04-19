@@ -1,4 +1,4 @@
-import { Pool, PoolConfig } from "pg";
+import { Pool, type PoolConfig, type PoolClient } from "pg";
 
 let pool: Pool | null = null;
 
@@ -36,16 +36,19 @@ export async function closePool(): Promise<void> {
  * Safe parameterized query helper. NEVER interpolate user input into
  * the SQL string — use $1, $2, ... and pass values in params.
  */
-export async function query<T extends Record<string, unknown> = Record<string, unknown>>(
+export async function query<T = Record<string, unknown>>(
   text: string,
   params: readonly unknown[] = []
 ): Promise<T[]> {
   const p = getPool();
-  const res = await p.query<T>(text, params as unknown[]);
-  return res.rows;
+  // pg's query<T> requires QueryResultRow (Record-shaped). Cast through
+  // unknown so domain types like ScoredMemoryEntry compile cleanly.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const res = await p.query<any>(text, params as unknown[]);
+  return res.rows as T[];
 }
 
-export async function withTx<T>(fn: (client: Awaited<ReturnType<Pool["connect"]>>) => Promise<T>): Promise<T> {
+export async function withTx<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");

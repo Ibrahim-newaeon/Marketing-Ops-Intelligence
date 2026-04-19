@@ -10,7 +10,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  ...(process.env.CI ? { workers: 2 } : {}),
   reporter: [
     ["list"],
     ["html", { outputFolder: "../../playwright-report", open: "never" }],
@@ -35,9 +35,10 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], baseURL: DASH_BASE },
     },
   ],
-  webServer: process.env.NO_WEB_SERVER
-    ? undefined
-    : [
+  ...(process.env.NO_WEB_SERVER
+    ? {}
+    : {
+  webServer: [
         {
           command: "pnpm run dev",
           cwd: "../..",
@@ -53,4 +54,5 @@ export default defineConfig({
           reuseExistingServer: !process.env.CI,
         },
       ],
+      }),
 });

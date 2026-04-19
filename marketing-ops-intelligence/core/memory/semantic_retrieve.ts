@@ -34,12 +34,19 @@ export async function semanticRetrieve(
 
   const fallback = async (reason: string): Promise<ScoredMemoryEntry[]> => {
     logger.info({ msg: "semantic_retrieve_fallback", reason });
-    const rows = await listMemoryEntries(opts.market_ids?.[0]);
-    return rows.slice(0, k).map((r) => ({
-      ...r,
-      similarity: 0,
-      retrieval: "recency" as const,
-    }));
+    try {
+      const rows = await listMemoryEntries(opts.market_ids?.[0]);
+      return rows.slice(0, k).map((r) => ({
+        ...r,
+        similarity: 0,
+        retrieval: "recency" as const,
+      }));
+    } catch (err) {
+      // No DB available either — return empty, never throw. The
+      // pipeline treats empty memory as first_run.
+      logger.warn({ msg: "semantic_retrieve_fallback_db_unavailable", err: (err as Error).message });
+      return [];
+    }
   };
 
   if (!opts.query || opts.query.trim().length === 0) {

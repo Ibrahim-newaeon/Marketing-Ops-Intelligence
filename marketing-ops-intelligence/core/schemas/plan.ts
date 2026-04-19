@@ -78,7 +78,7 @@ export const AllocatedMarket = z.object({
   country: Country,
   language: Language,
   budget_usd: z.number().nonnegative(),
-  channels: z.array(AllocatedChannel),
+  channels: z.array(AllocatedChannel).min(1, "at least one channel per market"),
   seo_strategy: SeoStrategy,
   geo_strategy: GeoStrategy,
   aeo_strategy: AeoStrategy,
@@ -116,29 +116,50 @@ export const AllocatedPlan = z
 export type AllocatedPlan = z.infer<typeof AllocatedPlan>;
 
 // Final StrategyPlan (budget_optimizer_agent)
-export const StrategyPlan = z.object({
-  run_id: z.string().uuid(),
-  version: z.string().regex(/^\d+\.\d+\.\d+$/, "semver"),
-  produced_at: z.string().datetime(),
-  status: PlanStatus,
-  first_run: z.boolean(),
-  total_budget_usd: z.number().nonnegative(),
-  optimization: z.object({
-    method: z.enum(["diminishing_returns_heuristic", "pass_through"]),
-    iterations: z.number().int().nonnegative(),
-    objective: z.enum(["maximize_expected_conversions", "maximize_reach"]),
-    expected_outcomes: z.array(
-      z.object({
-        market_id: z.string(),
-        channel: Channel,
-        kpi: z.string(),
-        forecast: z.number(),
-        ref: z.string(),
-      })
-    ),
-  }),
-  markets: z.array(AllocatedMarket).min(1),
-  assumptions: z.array(z.string()),
-  missing_data: MissingData,
-});
+export const StrategyPlan = z
+  .object({
+    run_id: z.string().uuid(),
+    version: z.string().regex(/^\d+\.\d+\.\d+$/, "semver"),
+    produced_at: z.string().datetime(),
+    status: PlanStatus,
+    first_run: z.boolean(),
+    total_budget_usd: z.number().nonnegative(),
+    optimization: z.object({
+      method: z.enum(["diminishing_returns_heuristic", "pass_through"]),
+      iterations: z.number().int().nonnegative(),
+      objective: z.enum(["maximize_expected_conversions", "maximize_reach"]),
+      expected_outcomes: z.array(
+        z.object({
+          market_id: z.string(),
+          channel: Channel,
+          kpi: z.string(),
+          forecast: z.number(),
+          ref: z.string(),
+        })
+      ),
+    }),
+    markets: z.array(AllocatedMarket).min(1),
+    assumptions: z.array(z.string()),
+    missing_data: MissingData,
+  })
+  .superRefine((val, ctx) => {
+    // Same budget invariants as AllocatedPlan: sum(markets) <= total
+    // (within $1 rounding) and sum(channels) == market.budget per market.
+    const sum = val.markets.reduce((acc, m) => acc + m.budget_usd, 0);
+    if (sum > val.total_budget_usd + 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `sum(markets.budget_usd)=${sum} exceeds total_budget_usd=${val.total_budget_usd}`,
+      });
+    }
+    for (const m of val.markets) {
+      const chanSum = m.channels.reduce((a, c) => a + c.budget_usd, 0);
+      if (Math.abs(chanSum - m.budget_usd) > 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `market ${m.market_id}: sum(channels.budget_usd)=${chanSum} mismatches market.budget_usd=${m.budget_usd}`,
+        });
+      }
+    }
+  });
 export type StrategyPlan = z.infer<typeof StrategyPlan>;
