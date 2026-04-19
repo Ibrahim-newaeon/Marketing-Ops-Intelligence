@@ -1,0 +1,41 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# build
+dist/
+build/
+.next/
+out/
+coverage/
+
+# logs
+*.log
+logs/
+npm-debug.log*
+pnpm-debug.log*
+
+# tests
+playwright-report/
+test-results/
+k6-results/
+
+# memory runtime (keep .gitkeep)
+memory/campaign_memory.json
+memory/audit_log.jsonl
+!memory/.gitkeep
+
+# ide
+.vscode/
+.idea/
+.DS_Store
+
+# docker
+.docker/

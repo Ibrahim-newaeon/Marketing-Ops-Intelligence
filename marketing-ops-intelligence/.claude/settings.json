@@ -1,0 +1,84 @@
+{
+  "$schema": "https://claude.com/schemas/settings.json",
+  "project": {
+    "name": "marketing-ops-intelligence",
+    "description": "Phase-gated multi-agent marketing pipeline for Gulf markets.",
+    "defaultModel": "claude-opus-4-7"
+  },
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash(pnpm *)",
+      "Bash(node *)",
+      "Bash(tsx *)",
+      "Bash(npx playwright *)",
+      "Bash(k6 run *)",
+      "Bash(docker compose *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "WebSearch",
+      "WebFetch"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(sudo *)",
+      "Bash(curl * | sh)",
+      "Bash(curl * | bash)",
+      "Bash(npm publish *)",
+      "Bash(pnpm publish *)",
+      "Bash(git push --force*)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean -f*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "command": ".claude/hooks/pre-phase-gate.sh"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write(memory/*)",
+        "command": ".claude/hooks/on_research_complete.sh"
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "^/approve_plan",
+        "command": ".claude/hooks/on_plan_approved.sh"
+      },
+      {
+        "matcher": "^/generate_plan_only|^/run_full_pipeline",
+        "command": ".claude/hooks/on_plan_generated.sh"
+      }
+    ]
+  },
+  "agents": {
+    "directory": ".claude/agents",
+    "defaultTools": ["Read", "Write"]
+  },
+  "skills": {
+    "directory": ".claude/skills"
+  },
+  "commands": {
+    "directory": ".claude/commands"
+  },
+  "memory": {
+    "path": "memory/campaign_memory.json",
+    "auditLog": "memory/audit_log.jsonl"
+  },
+  "env": {
+    "MOI_PHASE_GATE_STRICT": "true",
+    "MOI_APPROVAL_TIMEOUT_HOURS": "48",
+    "MOI_CAMPAIGN_DEFAULT_STATUS": "PAUSED"
+  }
+}
