@@ -27,10 +27,22 @@ playwright-report/
 test-results/
 k6-results/
 
-# memory runtime (keep .gitkeep)
+# memory runtime (keep .gitkeep, examples, and approval_state.json
+# is runtime-only too)
 memory/campaign_memory.json
 memory/audit_log.jsonl
+memory/approval_state.json
+memory/plan_feedback.jsonl
+memory/wa_queue.jsonl
+memory/context/
+memory/research/
+memory/plans/
+memory/execution/
+memory/dashboards/
+memory/timers/
 !memory/.gitkeep
+!memory/campaign_memory.example.json
+!memory/audit_log.example.jsonl
 
 # ide
 .vscode/
