@@ -25,8 +25,10 @@ pipeline with a mandatory human approval gate between planning and execution.
    `selected_markets[]` for the run. **Required first.** Without its
    `ResolvedClientContext`, no other agent runs.
 1. `memory_retrieval`
-2. Research agents (parallel): `market_research`, `competitor_intel`,
-   `audience_insights`, `keyword_research`
+2. Research agents (parallel — or batched via the Messages Batches API
+   when `MOI_USE_BATCH=true`, 50 % cheaper with ≤24h turnaround):
+   `market_research`, `competitor_intel`, `audience_insights`,
+   `keyword_research`
 3. Planning agents: `strategy_planner` → `multi_market_allocator` →
    `budget_optimizer`
 4. `approval_manager` validation

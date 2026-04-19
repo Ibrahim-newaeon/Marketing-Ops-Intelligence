@@ -85,6 +85,20 @@ Fallback: when `VOYAGE_API_KEY` is unset, query is empty, or no entries
 are embedded yet, `semanticRetrieve` transparently falls back to
 recency-based listing. `first_run=true` propagates unchanged.
 
+## 3.6 Batch mode for phase-2 research (`MOI_USE_BATCH`)
+
+Phase 2 runs four research agents. Their output feeds a 48-hour approval
+window, so realtime latency has no user-visible value. With
+`MOI_USE_BATCH=true`, `core/orchestrator/dispatch_batch.ts` packs all
+four into one Message Batches API call (`client.messages.batches`) —
+50 % cheaper and usually completes within an hour.
+
+Falls back to parallel realtime `dispatchAgent` calls if batch creation
+fails, the 30-minute polling ceiling is exceeded, or a per-custom-id
+result returns errored / expired / canceled (the missing agents get
+realtime fills). Default **off** to preserve dev-iteration latency;
+production runs should enable it.
+
 ## 4. Security boundaries
 
 | Boundary | Enforcement |

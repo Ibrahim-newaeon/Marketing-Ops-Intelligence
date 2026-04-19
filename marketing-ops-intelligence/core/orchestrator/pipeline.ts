@@ -169,15 +169,33 @@ export async function runPhases0to4(opts: RunOptions): Promise<RunResult> {
   });
   logger.info({ msg: "phase_1_complete", run_id: runId });
 
-  // ─── Phase 2: parallel research ────────────────────────────────────
-  const phase2Input = { ...baseInput, memory_context_ref: `memory/memory_context/${runId}/memory_retrieval_agent.json` };
-  const [marketRes, competitorRes, audienceRes, keywordRes] = await Promise.all([
-    dispatchAgent("market_research_agent", { runId, input: phase2Input, outputKind: "research" }),
-    dispatchAgent("competitor_intel_agent", { runId, input: phase2Input, outputKind: "research" }),
-    dispatchAgent("audience_insights_agent", { runId, input: phase2Input, outputKind: "research" }),
-    dispatchAgent("keyword_research_agent", { runId, input: phase2Input, outputKind: "research" }),
-  ]);
-  logger.info({ msg: "phase_2_complete", run_id: runId });
+  // ─── Phase 2: parallel research (or batched if MOI_USE_BATCH=true) ─
+  const phase2Input = {
+    ...baseInput,
+    memory_context_ref: `memory/memory_context/${runId}/memory_retrieval_agent.json`,
+  };
+  const researchAgents = [
+    "market_research_agent",
+    "competitor_intel_agent",
+    "audience_insights_agent",
+    "keyword_research_agent",
+  ] as const;
+  const useBatch = process.env.MOI_USE_BATCH === "true";
+  if (useBatch) {
+    const { dispatchBatch } = await import("./dispatch_batch");
+    await dispatchBatch({
+      runId,
+      outputKind: "research",
+      jobs: researchAgents.map((a) => ({ agentName: a, input: phase2Input })),
+    });
+  } else {
+    await Promise.all(
+      researchAgents.map((a) =>
+        dispatchAgent(a, { runId, input: phase2Input, outputKind: "research" })
+      )
+    );
+  }
+  logger.info({ msg: "phase_2_complete", run_id: runId, mode: useBatch ? "batch" : "realtime" });
 
   // ─── Phase 3: planning (serial) ────────────────────────────────────
   const phase3Input = {
