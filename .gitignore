@@ -1,9 +1,53 @@
-.venv/
-__pycache__/
-*.pyc
-.pytest_cache/
-*.egg-info/
-build/
-dist/
-output/
+# deps
+node_modules/
+.pnpm-store/
+
+# env & secrets
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# build
+dist/
+build/
+.next/
+out/
+coverage/
+
+# logs
+*.log
+logs/
+npm-debug.log*
+pnpm-debug.log*
+
+# tests
+playwright-report/
+test-results/
+k6-results/
+
+# memory runtime (keep .gitkeep, examples, and approval_state.json
+# is runtime-only too)
+memory/campaign_memory.json
+memory/audit_log.jsonl
+memory/approval_state.json
+memory/plan_feedback.jsonl
+memory/wa_queue.jsonl
+memory/context/
+memory/research/
+memory/plans/
+memory/execution/
+memory/dashboards/
+memory/timers/
+!memory/.gitkeep
+!memory/campaign_memory.example.json
+!memory/audit_log.example.jsonl
+
+# ide
+.vscode/
+.idea/
+.DS_Store
+
+# docker
+.docker/
