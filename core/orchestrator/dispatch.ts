@@ -69,6 +69,7 @@ export async function dispatchAgent<T = unknown>(
   // JSON schema for the single structured-output tool. zod-to-json-schema
   // returns a $schema-wrapped object; strip the envelope, keep the object
   // schema the tool expects.
+  // @ts-expect-error — zod-to-json-schema deep instantiation is safe at runtime
   const jsonSchemaRaw = zodToJsonSchema(schema, { name: `${agentName}_output` }) as {
     definitions?: Record<string, unknown>;
     $ref?: string;
