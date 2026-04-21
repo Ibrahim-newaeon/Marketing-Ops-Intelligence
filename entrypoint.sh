@@ -3,7 +3,7 @@ set -e
 
 # Railway assigns PORT. Express API takes it (serves /api/* + proxies dashboard).
 # Next.js dashboard runs on internal port 3001.
-export DASHBOARD_PORT=3001
+export DASHBOARD_PORT=4000
 
 echo "[entrypoint] starting Next.js dashboard on port $DASHBOARD_PORT"
 npx next start dashboards -p $DASHBOARD_PORT &
