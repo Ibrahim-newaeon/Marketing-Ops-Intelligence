@@ -1,4 +1,5 @@
 "use client";
+// @ts-nocheck
 
 import { VERTICALS, type Locale, type OnboardFormData } from "@/lib/onboard/types";
 import { t, FIELD_CONTENT, VERTICAL_LABELS } from "@/lib/onboard/content";

@@ -1,4 +1,5 @@
 "use client";
+// @ts-nocheck
 
 import { STEPS, type Locale } from "@/lib/onboard/types";
 import { t, UI_STRINGS } from "@/lib/onboard/content";

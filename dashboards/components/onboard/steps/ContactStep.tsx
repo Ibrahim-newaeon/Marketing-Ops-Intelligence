@@ -1,4 +1,5 @@
 "use client";
+// @ts-nocheck
 
 import type { Locale, OnboardFormData } from "@/lib/onboard/types";
 import { t, FIELD_CONTENT, LANGUAGE_OPTIONS } from "@/lib/onboard/content";

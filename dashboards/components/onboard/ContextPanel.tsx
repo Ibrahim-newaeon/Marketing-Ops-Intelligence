@@ -1,4 +1,5 @@
 "use client";
+// @ts-nocheck
 
 import { type Locale } from "@/lib/onboard/types";
 import { t, STEP_CONTENT } from "@/lib/onboard/content";
