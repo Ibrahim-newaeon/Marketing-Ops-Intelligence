@@ -5,7 +5,6 @@ import {
   Readex_Pro,
   Noto_Kufi_Arabic,
 } from "next/font/google";
-import "../globals.css";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -36,7 +35,7 @@ const notoKufi = Noto_Kufi_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: "Client Onboarding \u2014 Marketing Ops Intelligence",
+  title: "Client Onboarding — Marketing Ops Intelligence",
   description: "Set up your client profile to launch the marketing pipeline.",
 };
 
@@ -46,15 +45,11 @@ export default function OnboardLayout({
   children: React.ReactNode;
 }): JSX.Element {
   return (
-    <html
-      lang="en"
-      dir="ltr"
-      suppressHydrationWarning
-      className={`${bricolage.variable} ${hanken.variable} ${readex.variable} ${notoKufi.variable}`}
+    <div
+      className={`${bricolage.variable} ${hanken.variable} ${readex.variable} ${notoKufi.variable} min-h-screen antialiased`}
+      id="onboard-root"
     >
-      <body className="ob-theme-light min-h-screen bg-ob-bg text-ob-text antialiased">
-        {children}
-      </body>
-    </html>
+      {children}
+    </div>
   );
 }
