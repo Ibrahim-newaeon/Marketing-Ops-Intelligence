@@ -288,6 +288,7 @@ export function OnboardingFlow(): JSX.Element {
 
   const isOnReview = state.step === REVIEW_STEP;
   const currentStepDef = STEPS[state.step];
+  const currentContent = STEP_CONTENT[state.step];
 
   // ── Render ─────────────────────────────────────────────────────
   return (
@@ -381,10 +382,10 @@ export function OnboardingFlow(): JSX.Element {
               {/* Conversational header */}
               <div className="mb-8">
                 <h2 className="font-display text-2xl font-semibold tracking-tight text-ob-text">
-                  {t(STEP_CONTENT[state.step].header, state.locale)}
+                  {currentContent ? t(currentContent.header, state.locale) : ""}
                 </h2>
                 <p className="mt-2 text-sm text-ob-muted leading-relaxed max-w-prose">
-                  {t(STEP_CONTENT[state.step].subheader, state.locale)}
+                  {currentContent ? t(currentContent.subheader, state.locale) : ""}
                 </p>
               </div>
 
