@@ -28,7 +28,6 @@ COPY --from=build --chown=app:app /app/config ./config
 COPY --from=build --chown=app:app /app/memory ./memory
 COPY --from=build --chown=app:app /app/entrypoint.sh ./entrypoint.sh
 USER app
-EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost:3000/api/health || exit 1
+EXPOSE ${PORT:-3000}
+HEALTHCHECK NONE
 CMD ["sh", "entrypoint.sh"]
