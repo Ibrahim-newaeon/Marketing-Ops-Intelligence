@@ -24,7 +24,6 @@ COPY --from=build --chown=app:app /app/dist ./dist
 COPY --from=build --chown=app:app /app/node_modules ./node_modules
 COPY --from=build --chown=app:app /app/package.json ./package.json
 COPY --from=build --chown=app:app /app/dashboards/.next ./dashboards/.next
-COPY --from=build --chown=app:app /app/dashboards/public ./dashboards/public
 COPY --from=build --chown=app:app /app/config ./config
 COPY --from=build --chown=app:app /app/memory ./memory
 COPY --from=build --chown=app:app /app/entrypoint.sh ./entrypoint.sh
