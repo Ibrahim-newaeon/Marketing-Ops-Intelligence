@@ -7,7 +7,6 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  output: "standalone",
   poweredByHeader: false,
   async redirects() {
     return [{ source: "/", destination: "/overview", permanent: false }];
