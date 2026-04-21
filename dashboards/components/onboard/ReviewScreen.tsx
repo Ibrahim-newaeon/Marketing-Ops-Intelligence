@@ -442,7 +442,7 @@ export function ReviewScreen({
         </button>
 
         <a
-          href="/dashboard"
+          href="/overview"
           className="text-sm font-body text-ob-primary hover:underline"
         >
           {t(UI_STRINGS.goToDashboard, locale)}

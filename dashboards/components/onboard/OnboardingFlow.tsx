@@ -114,8 +114,14 @@ export function OnboardingFlow(): JSX.Element {
   const [state, dispatch] = useReducer(reducer, initialState);
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // Load draft on mount
+  // Load draft on mount (skip if ?new=1)
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new") === "1") {
+      clearDraft();
+      window.history.replaceState({}, "", "/onboard");
+      return;
+    }
     const draft = loadDraft();
     if (draft) {
       dispatch({ type: "LOAD_DRAFT", data: draft.data, step: draft.step });
@@ -146,9 +152,13 @@ export function OnboardingFlow(): JSX.Element {
 
   // Theme + locale on document
   useEffect(() => {
-    const body = document.body;
-    body.classList.remove("ob-theme-light", "ob-theme-dark");
-    body.classList.add(`ob-theme-${state.theme}`);
+    const root = document.getElementById("onboard-root");
+    if (root) {
+      root.classList.remove("ob-theme-light", "ob-theme-dark");
+      root.classList.add(`ob-theme-${state.theme}`);
+      root.style.backgroundColor = "var(--ob-bg)";
+      root.style.color = "var(--ob-text)";
+    }
     document.documentElement.lang = state.locale;
     document.documentElement.dir = state.locale === "ar" ? "rtl" : "ltr";
   }, [state.theme, state.locale]);
@@ -255,7 +265,17 @@ export function OnboardingFlow(): JSX.Element {
         throw new Error(`Failed to create profile: ${res.status} ${text}`);
       }
 
+      // Trigger pipeline (phases 0-4) — non-blocking
+      fetch(`${API_BASE}/api/pipeline/run`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ client_id: clientId }),
+      }).catch(() => {
+        /* pipeline trigger is best-effort from the UI */
+      });
+
       clearDraft();
+      window.location.href = "/overview";
     } catch (err) {
       dispatch({ type: "SET_SUBMITTING", value: false });
       dispatch({

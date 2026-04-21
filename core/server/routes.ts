@@ -58,6 +58,23 @@ export function mountRoutes(app: Express): void {
     res.json({ clients });
   });
 
+  app.post("/api/clients", requireAuth, (req, res) => {
+    try {
+      const profile = ClientProfile.parse(req.body);
+      if (!fs.existsSync(CLIENTS_DIR)) {
+        fs.mkdirSync(CLIENTS_DIR, { recursive: true });
+      }
+      const file = path.join(CLIENTS_DIR, `${profile.client_id}.json`);
+      if (fs.existsSync(file)) {
+        return res.status(409).json({ ok: false, code: "client_exists", detail: `${profile.client_id} already exists` });
+      }
+      fs.writeFileSync(file, JSON.stringify(profile, null, 2), "utf8");
+      res.status(201).json({ ok: true, client_id: profile.client_id });
+    } catch (err) {
+      res.status(422).json({ ok: false, code: "invalid_profile", detail: (err as Error).message });
+    }
+  });
+
   app.get("/api/clients/:id", requireAuth, (req, res) => {
     const file = path.join(CLIENTS_DIR, `${req.params.id}.json`);
     if (!fs.existsSync(file)) {
