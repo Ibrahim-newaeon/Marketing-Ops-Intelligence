@@ -38,3 +38,62 @@
   body { @apply bg-background text-foreground; }
   [dir="rtl"] { font-family: system-ui, "Segoe UI", "Noto Naskh Arabic", sans-serif; }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Onboarding design tokens (OKLCH)                                   */
+/* ------------------------------------------------------------------ */
+
+.ob-theme-light {
+  --ob-bg:            oklch(0.985 0.003 260);
+  --ob-surface:       oklch(1.000 0.000 0);
+  --ob-text:          oklch(0.205 0.015 260);
+  --ob-muted:         oklch(0.556 0.012 260);
+  --ob-border:        oklch(0.908 0.006 260);
+  --ob-primary:       oklch(0.445 0.085 260);
+  --ob-primary-hover: oklch(0.380 0.075 260);
+  --ob-accent:        oklch(0.545 0.150 155);
+  --ob-accent-hover:  oklch(0.490 0.135 155);
+  --ob-error:         oklch(0.530 0.180 25);
+  --ob-success:       oklch(0.545 0.150 155);
+  --ob-warn:          oklch(0.750 0.140 80);
+}
+
+.ob-theme-dark {
+  --ob-bg:            oklch(0.170 0.015 260);
+  --ob-surface:       oklch(0.215 0.018 260);
+  --ob-text:          oklch(0.935 0.006 260);
+  --ob-muted:         oklch(0.600 0.012 260);
+  --ob-border:        oklch(0.310 0.015 260);
+  --ob-primary:       oklch(0.720 0.060 260);
+  --ob-primary-hover: oklch(0.790 0.050 260);
+  --ob-accent:        oklch(0.620 0.150 155);
+  --ob-accent-hover:  oklch(0.680 0.135 155);
+  --ob-error:         oklch(0.620 0.180 25);
+  --ob-success:       oklch(0.620 0.150 155);
+  --ob-warn:          oklch(0.780 0.130 80);
+}
+
+/* Font families (set by onboard layout via next/font CSS vars) */
+.font-display { font-family: var(--font-display), system-ui, sans-serif; }
+.font-body    { font-family: var(--font-body), system-ui, sans-serif; }
+[dir="rtl"] .font-display { font-family: var(--font-display-ar), var(--font-display), system-ui, sans-serif; }
+[dir="rtl"] .font-body    { font-family: var(--font-body-ar), var(--font-body), system-ui, sans-serif; }
+
+/* Utility animations for onboarding */
+@keyframes ob-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+@keyframes ob-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ob-save-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+.animate-shake      { animation: ob-shake 0.4s ease-out; }
+.animate-fade-in    { animation: ob-fade-in 0.35s ease-out both; }
+.animate-save-pulse { animation: ob-save-pulse 1.2s ease-in-out infinite; }
