@@ -47,14 +47,15 @@ function reducer(state: State, action: Action): State {
     case "SET_FIELD": {
       const keys = action.field.split(".");
       if (keys.length === 2) {
-        const [parent, child] = keys;
+        const parent = keys[0] as string;
+        const child = keys[1] as string;
         const parentObj = state.data[parent as keyof OnboardFormData];
         if (parentObj && typeof parentObj === "object" && !Array.isArray(parentObj)) {
           return {
             ...state,
             data: {
               ...state.data,
-              [parent]: { ...(parentObj as Record<string, unknown>), [child]: action.value },
+              [parent as string]: { ...(parentObj as Record<string, unknown>), [child as string]: action.value },
             },
             errors: { ...state.errors, [action.field]: "" },
           };
