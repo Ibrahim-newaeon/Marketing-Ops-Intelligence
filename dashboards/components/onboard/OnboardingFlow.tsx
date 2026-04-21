@@ -47,14 +47,15 @@ function reducer(state: State, action: Action): State {
     case "SET_FIELD": {
       const keys = action.field.split(".");
       if (keys.length === 2) {
-        const [parent, child] = keys;
+        const parent = keys[0] as string;
+        const child = keys[1] as string;
         const parentObj = state.data[parent as keyof OnboardFormData];
         if (parentObj && typeof parentObj === "object" && !Array.isArray(parentObj)) {
           return {
             ...state,
             data: {
               ...state.data,
-              [parent]: { ...(parentObj as Record<string, unknown>), [child]: action.value },
+              [parent as string]: { ...(parentObj as Record<string, unknown>), [child as string]: action.value },
             },
             errors: { ...state.errors, [action.field]: "" },
           };
@@ -287,6 +288,7 @@ export function OnboardingFlow(): JSX.Element {
 
   const isOnReview = state.step === REVIEW_STEP;
   const currentStepDef = STEPS[state.step];
+  const currentContent = STEP_CONTENT[state.step];
 
   // ── Render ─────────────────────────────────────────────────────
   return (
@@ -380,10 +382,10 @@ export function OnboardingFlow(): JSX.Element {
               {/* Conversational header */}
               <div className="mb-8">
                 <h2 className="font-display text-2xl font-semibold tracking-tight text-ob-text">
-                  {t(STEP_CONTENT[state.step].header, state.locale)}
+                  {currentContent ? t(currentContent.header, state.locale) : ""}
                 </h2>
                 <p className="mt-2 text-sm text-ob-muted leading-relaxed max-w-prose">
-                  {t(STEP_CONTENT[state.step].subheader, state.locale)}
+                  {currentContent ? t(currentContent.subheader, state.locale) : ""}
                 </p>
               </div>
 
