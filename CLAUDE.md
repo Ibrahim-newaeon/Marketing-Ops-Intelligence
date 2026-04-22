@@ -264,6 +264,14 @@ structured assembly go to Haiku; synthesis + reasoning keep Opus. See
    Ramadan calendar.
 5. `whatsapp-notify` — builds Meta Cloud API payloads, picks AR/EN template,
    24h window, signature verification.
+6. `paid-campaign-safety` — auto-fires for meta / google / snap / tiktok
+   execution. Enforces PAUSED default, 7d-click / 1d-view attribution,
+   existing-customer exclusion, per-market budget cap, pixel + CAPI test
+   events within 24h. Blocks any ACTIVE emission or unverified tracking.
+7. `aeo-schema` — auto-fires for `aeo_execution_agent` and any JSON-LD
+   emission. Enforces schema.org templates for FAQPage, HowTo, Product,
+   Organization, BreadcrumbList; requires validator-passing stamp for
+   both AR and EN before publishing.
 
 ---
 
