@@ -10,7 +10,8 @@
  *
  * Same caching + strict tool-use pattern as core/orchestrator/dispatch.ts:
  *   system  = [CLAUDE.md (cached), agent body (cached)]
- *   tool    = emit_output with strict:true
+ *   tool    = emit_output (strict off — grammar-size limit on large agents;
+ *             Zod re-validates the input on result fetch)
  *   choice  = force emit_output
  *
  * On batch failure (anything non-"ended" after the ceiling, or any
@@ -97,7 +98,7 @@ function buildRequest(runId: string, job: BatchJob): BatchRequest {
     model: model.id,
     max_tokens: Math.min(model.max_tokens, 8192),
     system: systemBlocks as unknown as Anthropic.MessageCreateParams["system"],
-    tools: [{ ...tool, strict: true } as unknown as Anthropic.Tool],
+    tools: [tool as unknown as Anthropic.Tool],
     tool_choice: { type: "tool", name: "emit_output" },
     messages: [{ role: "user", content: userMessage }],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
