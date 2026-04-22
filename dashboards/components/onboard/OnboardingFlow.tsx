@@ -1,12 +1,13 @@
 "use client";
 
-import { useReducer, useEffect, useCallback, useRef } from "react";
+import { useReducer, useEffect, useCallback, useRef, useState } from "react";
 import type { Locale, Theme, OnboardFormData } from "@/lib/onboard/types";
 import { STEPS, INITIAL_FORM_DATA, REVIEW_STEP, COUNTRIES, getCountry } from "@/lib/onboard/types";
 import { STEP_CONTENT, UI_STRINGS, t } from "@/lib/onboard/content";
 import { validateStep, type FieldErrors } from "@/lib/onboard/validation";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/onboard/storage";
 
+import { getAuthStatus, isUnlocked, type AuthStatus } from "@/lib/api";
 import { StepIndicator } from "./StepIndicator";
 import { ContextPanel } from "./ContextPanel";
 import { ReviewScreen } from "./ReviewScreen";
@@ -114,6 +115,41 @@ const initialState: State = {
 export function OnboardingFlow(): JSX.Element {
   const [state, dispatch] = useReducer(reducer, initialState);
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const [auth, setAuth] = useState<AuthStatus | null>(null);
+  const [unlocked, setUnlocked] = useState<boolean | null>(null);
+
+  // Auth check on mount — if auth is configured and the caller has no
+  // valid cookie, Launch will 401. Show a persistent banner so the user
+  // doesn't fill the form for nothing.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const status = await getAuthStatus();
+        if (cancelled) return;
+        setAuth(status);
+        if (status.configured) {
+          const ok = await isUnlocked().catch(() => false);
+          if (!cancelled) setUnlocked(ok);
+        } else {
+          setUnlocked(true);
+        }
+      } catch {
+        setAuth(null);
+        setUnlocked(true); // don't block UX on probe failure
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const onOnboardUnlock = (): void => {
+    const token = window.prompt("Principal token:");
+    if (!token) return;
+    const next = window.location.pathname + window.location.search;
+    window.location.href = `/api/auth/login?token=${encodeURIComponent(token)}&next=${encodeURIComponent(next)}`;
+  };
 
   // Load draft on mount (skip if ?new=1)
   useEffect(() => {
@@ -262,6 +298,11 @@ export function OnboardingFlow(): JSX.Element {
 
       if (!res.ok) {
         const text = await res.text().catch(() => "");
+        if (res.status === 401) {
+          throw new Error(
+            "Unlock required — this deployment has a principal token. Click the Unlock banner at the top of the page."
+          );
+        }
         throw new Error(`Failed to create profile: ${res.status} ${text}`);
       }
 
@@ -341,6 +382,29 @@ export function OnboardingFlow(): JSX.Element {
           </a>
         </div>
       </header>
+
+      {/* Auth gate banner — shown when principal token is configured but not set on this browser */}
+      {auth?.configured && unlocked === false && (
+        <div
+          data-testid="onboard-auth-banner"
+          role="alert"
+          className="flex items-center justify-between gap-3 border-b border-amber-300 bg-amber-50 px-6 py-2.5 text-xs text-amber-900"
+        >
+          <span>
+            <strong className="font-semibold">Unlock required.</strong>{" "}
+            This deployment has a principal token. Launching the pipeline
+            will fail until you unlock this browser.
+          </span>
+          <button
+            type="button"
+            data-testid="onboard-auth-unlock"
+            onClick={onOnboardUnlock}
+            className="rounded-md border border-amber-400 bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-200"
+          >
+            Unlock
+          </button>
+        </div>
+      )}
 
       {/* Welcome back banner */}
       {state.showWelcomeBack && (

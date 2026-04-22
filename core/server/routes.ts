@@ -63,6 +63,12 @@ export function mountRoutes(app: Express): void {
     // Do not echo token presence from request — just report config posture.
     res.json({ configured, enforced });
   });
+  // Authenticated probe — 200 if the caller's cookie/header is valid,
+  // 401 otherwise. Used by the onboarding UI to decide whether to show
+  // the unlock gate before the user fills out the form.
+  app.get("/api/auth/check", requirePrincipal, (_req, res) => {
+    res.json({ ok: true });
+  });
 
   // ─── Clients ───────────────────────────────────────────────────────
   app.get("/api/clients", async (_req, res) => {

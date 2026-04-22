@@ -53,6 +53,18 @@ export async function getAuthStatus(): Promise<AuthStatus> {
   return request<AuthStatus>("/api/auth/status");
 }
 
+// Returns true when the caller has a valid principal cookie/header; false
+// on 401; throws on other errors. Used to gate the onboarding flow.
+export async function isUnlocked(): Promise<boolean> {
+  try {
+    await request<{ ok: boolean }>("/api/auth/check");
+    return true;
+  } catch (e) {
+    if (/\b401\b/.test((e as Error).message)) return false;
+    throw e;
+  }
+}
+
 export async function getDashboard(): Promise<DashboardPayload | EmptyDashboard> {
   return request<DashboardPayload | EmptyDashboard>("/api/dashboard");
 }

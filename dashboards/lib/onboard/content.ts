@@ -304,7 +304,7 @@ export const UI_STRINGS = {
   skip: { en: "Skip this step", ar: "\u062a\u062e\u0637\u064a \u0647\u0630\u0647 \u0627\u0644\u062e\u0637\u0648\u0629" },
   saved: { en: "Saved", ar: "\u062a\u0645 \u0627\u0644\u062d\u0641\u0638" },
   saving: { en: "Saving\u2026", ar: "\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0641\u0638\u2026" },
-  saveAndExit: { en: "Save & exit", ar: "\u062d\u0641\u0638 \u0648\u062e\u0631\u0648\u062c" },
+  saveAndExit: { en: "Exit (draft saved)", ar: "\u062e\u0631\u0648\u062c (\u0645\u0633\u0648\u062f\u0629 \u0645\u062d\u0641\u0648\u0638\u0629)" },
   launchPipeline: { en: "Launch Pipeline", ar: "\u0625\u0637\u0644\u0627\u0642 \u0627\u0644\u0639\u0645\u0644\u064a\u0629" },
   reviewTitle: { en: "Review your profile", ar: "\u0631\u0627\u062c\u0639 \u0645\u0644\u0641\u0643 \u0627\u0644\u0634\u062e\u0635\u064a" },
   reviewSubtitle: {
