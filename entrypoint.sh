@@ -21,22 +21,30 @@ else
   echo "[entrypoint] DATABASE_URL not set — skipping migrations (clients adapter will fall back to filesystem)"
 fi
 
-echo "[entrypoint] starting Next.js dashboard on port $DASHBOARD_PORT (INTERNAL_API_PORT=$INTERNAL_API_PORT)"
-npx next start dashboards -p $DASHBOARD_PORT &
-NEXT_PID=$!
-
-# Wait for Next.js to be ready before starting Express (which proxies to it).
-for i in 1 2 3 4 5 6 7 8 9 10; do
-  if wget -q -O /dev/null http://127.0.0.1:$DASHBOARD_PORT/ 2>/dev/null; then
-    echo "[entrypoint] Next.js ready"
-    break
-  fi
-  echo "[entrypoint] waiting for Next.js... ($i)"
-  sleep 2
-done
-
-echo "[entrypoint] starting Express API on port $PORT"
+# Start Express FIRST. /api/health must respond to Railway's healthcheck
+# ASAP — before Next.js finishes its (~2–10s) cold start. Non-API routes
+# will 502 briefly until Next.js is up; that's fine, they're not on the
+# healthcheck path. This matters on Railway because the deploy
+# healthcheck timeout is short and the container is killed if /api/health
+# doesn't answer in time.
+echo "[entrypoint] starting Express API on port $PORT (INTERNAL_API_PORT=$INTERNAL_API_PORT)"
 node dist/core/server/index.js &
 EXPRESS_PID=$!
 
-wait $NEXT_PID $EXPRESS_PID
+echo "[entrypoint] starting Next.js dashboard on port $DASHBOARD_PORT"
+npx next start dashboards -p $DASHBOARD_PORT &
+NEXT_PID=$!
+
+# Block on Express specifically — it's what Railway's healthcheck hits.
+# If Express dies, kill Next.js and exit so Railway restarts the
+# container. If Next.js dies first we keep Express alive so /api/health
+# still answers; Express's proxy will return 502 on dashboard requests
+# (visible, recoverable) rather than the whole container cycling.
+# `wait -n` is not portable to BusyBox ash, so we explicitly wait on
+# the Express pid.
+wait $EXPRESS_PID
+EXIT_CODE=$?
+echo "[entrypoint] Express exited with code $EXIT_CODE — tearing down Next.js"
+kill $NEXT_PID 2>/dev/null || true
+wait 2>/dev/null || true
+exit $EXIT_CODE
