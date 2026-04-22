@@ -254,8 +254,7 @@ export function OnboardingFlow(): JSX.Element {
           .join(" | "),
       };
 
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:3000";
-      const res = await fetch(`${API_BASE}/api/clients`, {
+      const res = await fetch("/api/clients", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(profile),
@@ -267,7 +266,7 @@ export function OnboardingFlow(): JSX.Element {
       }
 
       // Trigger pipeline (phases 0-4) — non-blocking
-      fetch(`${API_BASE}/api/pipeline/run`, {
+      fetch("/api/pipeline/run", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ client_id: clientId }),

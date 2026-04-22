@@ -58,7 +58,7 @@ export function mountRoutes(app: Express): void {
     res.json({ clients });
   });
 
-  app.post("/api/clients", requireAuth, (req, res) => {
+  app.post("/api/clients", (req, res) => {
     try {
       const profile = ClientProfile.parse(req.body);
       if (!fs.existsSync(CLIENTS_DIR)) {
@@ -89,7 +89,7 @@ export function mountRoutes(app: Express): void {
   });
 
   // ─── Pipeline ──────────────────────────────────────────────────────
-  app.post("/api/pipeline/run", requireAuth, async (req, res) => {
+  app.post("/api/pipeline/run", async (req, res) => {
     const body = req.body as {
       client_id?: string;
       markets_override?: string[];

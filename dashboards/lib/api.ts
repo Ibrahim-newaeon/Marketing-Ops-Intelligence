@@ -5,7 +5,12 @@
  */
 import type { DashboardPayload, TabSlug } from "@schemas/dashboard";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:3000";
+// Server-side (SSR): reach Express on the same container via 127.0.0.1:$PORT.
+// Client-side (browser): use relative URLs so requests go to the same origin.
+const API_BASE =
+  typeof window === "undefined"
+    ? `http://127.0.0.1:${process.env.PORT ?? 3000}`
+    : "";
 
 export type TabData = DashboardPayload["tabs"][TabSlug];
 
