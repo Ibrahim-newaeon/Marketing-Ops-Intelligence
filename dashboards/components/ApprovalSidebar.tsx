@@ -1,6 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getDashboardContext, type DashboardContext, type DashboardContextPending } from "@/lib/api";
+import {
+  getDashboardContext,
+  runPipeline,
+  type DashboardContext,
+  type DashboardContextPending,
+} from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 function hoursUntil(iso: string): number {
@@ -62,6 +67,8 @@ function PendingCard({ p }: { p: DashboardContextPending }): JSX.Element {
 export function ApprovalSidebar(): JSX.Element {
   const [ctx, setCtx] = useState<DashboardContext | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [runningId, setRunningId] = useState<string | null>(null);
+  const [runMsg, setRunMsg] = useState<{ id: string; text: string; tone: "ok" | "err" } | null>(null);
 
   const load = (): void => {
     getDashboardContext()
@@ -70,6 +77,24 @@ export function ApprovalSidebar(): JSX.Element {
         setErr(null);
       })
       .catch((e) => setErr((e as Error).message));
+  };
+
+  const onRun = async (clientId: string): Promise<void> => {
+    setRunningId(clientId);
+    setRunMsg(null);
+    try {
+      const r = await runPipeline(clientId, true);
+      setRunMsg({
+        id: clientId,
+        text: r.run_id ? `run ${r.run_id.slice(0, 8)}… started` : "run started",
+        tone: "ok",
+      });
+      load();
+    } catch (e) {
+      setRunMsg({ id: clientId, text: (e as Error).message, tone: "err" });
+    } finally {
+      setRunningId(null);
+    }
   };
 
   useEffect(() => {
@@ -118,27 +143,57 @@ export function ApprovalSidebar(): JSX.Element {
         data-testid="sidebar-clients"
         className="mt-2 space-y-1 text-xs"
       >
-        {(ctx?.clients ?? []).map((c) => (
-          <li
-            key={c.id}
-            data-testid={`sidebar-client-${c.id}`}
-            className="rounded-md border border-border bg-background p-2"
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-semibold">{c.id}</span>
-              <span className="text-[10px] text-muted-foreground">{c.vertical}</span>
-            </div>
-            <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{c.name}</div>
-            <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-              <span>{c.markets_count} market{c.markets_count === 1 ? "" : "s"}</span>
-              {c.regulated && (
-                <span className="rounded bg-destructive/10 px-1 py-[1px] text-destructive">
-                  regulated
-                </span>
+        {(ctx?.clients ?? []).map((c) => {
+          const isRunning = runningId === c.id;
+          const msg = runMsg && runMsg.id === c.id ? runMsg : null;
+          return (
+            <li
+              key={c.id}
+              data-testid={`sidebar-client-${c.id}`}
+              className="rounded-md border border-border bg-background p-2"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">{c.id}</span>
+                <span className="text-[10px] text-muted-foreground">{c.vertical}</span>
+              </div>
+              <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{c.name}</div>
+              <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                <span>{c.markets_count} market{c.markets_count === 1 ? "" : "s"}</span>
+                {c.regulated && (
+                  <span className="rounded bg-destructive/10 px-1 py-[1px] text-destructive">
+                    regulated
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                data-testid={`sidebar-client-run-${c.id}`}
+                onClick={() => void onRun(c.id)}
+                disabled={isRunning || Boolean(ctx?.pending_approval)}
+                aria-label={`Run pipeline for ${c.id}`}
+                className={cn(
+                  "mt-2 w-full rounded-md border px-2 py-1 text-[11px] font-semibold transition",
+                  "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20",
+                  "disabled:cursor-not-allowed disabled:opacity-50"
+                )}
+              >
+                {isRunning ? "Starting…" : ctx?.pending_approval ? "Approval pending" : "Run pipeline"}
+              </button>
+              {msg && (
+                <div
+                  data-testid={`sidebar-client-run-msg-${c.id}`}
+                  role="status"
+                  className={cn(
+                    "mt-1 text-[10px]",
+                    msg.tone === "ok" ? "text-emerald-700" : "text-destructive"
+                  )}
+                >
+                  {msg.text}
+                </div>
               )}
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
         {ctx && ctx.clients.length === 0 && (
           <li data-testid="sidebar-clients-empty" className="text-muted-foreground">
             No clients in <span className="font-mono">config/clients/</span>.

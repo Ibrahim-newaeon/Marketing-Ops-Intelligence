@@ -78,3 +78,20 @@ export interface DashboardContext {
 export async function getDashboardContext(): Promise<DashboardContext> {
   return request<DashboardContext>("/api/dashboard/context");
 }
+
+export interface RunPipelineResponse {
+  run_id?: string;
+  status?: string;
+  plan_version?: string;
+  [k: string]: unknown;
+}
+
+export async function runPipeline(
+  client_id: string,
+  stop_after_plan = true
+): Promise<RunPipelineResponse> {
+  return request<RunPipelineResponse>("/api/pipeline/run", {
+    method: "POST",
+    body: JSON.stringify({ client_id, stop_after_plan }),
+  });
+}
