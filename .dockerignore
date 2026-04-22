@@ -1,0 +1,69 @@
+# Keeps the Docker build context small and reproducible on Railway /
+# any remote builder. Without this, COPY . . in the build stage pulls
+# in .git (slow), local dist/.next/ (stale artifacts that shadow what
+# the build stage would produce), and host-side node_modules (wrong
+# arch/glibc when building in CI).
+
+# git
+.git
+.gitignore
+.gitattributes
+
+# deps (rebuilt in the deps stage)
+node_modules
+.pnpm-store
+
+# build output (rebuilt in the build stage)
+dist
+build
+.next
+dashboards/.next
+coverage
+out
+
+# local env — secrets MUST stay out of images
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# runtime memory (gitignored; each deploy starts fresh)
+memory/campaign_memory.json
+memory/audit_log.jsonl
+memory/approval_state.json
+memory/plan_feedback.jsonl
+memory/wa_queue.jsonl
+memory/context
+memory/research
+memory/plans
+memory/execution
+memory/dashboards
+memory/timers
+
+# logs
+*.log
+logs
+npm-debug.log*
+pnpm-debug.log*
+
+# tests
+playwright-report
+test-results
+k6-results
+tests/playwright
+tests/k6
+
+# ide / os
+.vscode
+.idea
+.DS_Store
+
+# docker + ci
+docker-compose.yml
+.dockerignore
+.github
+
+# docs
+README.md
+docs

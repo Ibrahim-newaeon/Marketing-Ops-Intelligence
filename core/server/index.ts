@@ -47,6 +47,12 @@ function rawBodyCapture(req: Request & { rawBody?: Buffer }, _res: Response, nex
 export function createApp(): express.Express {
   const app = express();
   app.disable("x-powered-by");
+  // Behind Railway's load balancer. Trust one hop so req.ip and
+  // req.secure reflect the real client — required for
+  // express-rate-limit to key on the caller and for loginHandler's
+  // Secure-cookie detection. `1` is the minimum that satisfies
+  // express-rate-limit's permissive trust-proxy validator.
+  app.set("trust proxy", 1);
   app.use(rawBodyCapture);
   // Only apply Helmet CSP, rate limiting, and JSON parsing to /api routes.
   // Non-API requests are proxied to Next.js which sets its own headers.

@@ -31,8 +31,10 @@ const MEMORY = path.join(ROOT, "memory");
 
 /**
  * Recursively strip JSON schema keywords that zod-to-json-schema emits
- * but Anthropic's tool input_schema rejects. The error surface is:
+ * but Anthropic's tool input_schema rejects. Error surfaces seen:
  *   tools.0.custom: For 'number' type, properties maximum, minimum are not supported
+ *   tools.0.custom: For 'object' type, 'additionalProperties: object' is not supported.
+ *                   Please set 'additionalProperties' to false
  * Also guards against format/pattern keywords that occasionally trip the
  * validator for generated schemas.
  */
@@ -55,9 +57,19 @@ const UNSUPPORTED_SCHEMA_KEYS = new Set([
 export function sanitizeForAnthropicToolSchema(node: unknown): unknown {
   if (Array.isArray(node)) return node.map(sanitizeForAnthropicToolSchema);
   if (node && typeof node === "object") {
+    const obj = node as Record<string, unknown>;
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+    for (const [k, v] of Object.entries(obj)) {
       if (UNSUPPORTED_SCHEMA_KEYS.has(k)) continue;
+      // Anthropic's tool validator rejects `additionalProperties: {..schema..}`
+      // (emitted by zod-to-json-schema for z.record(...) types). It must be
+      // a boolean — coerce object-shaped values to `false` since tool-use
+      // strict mode disallows unknown keys anyway. Boolean/undefined pass
+      // through recursion below as-is.
+      if (k === "additionalProperties" && v !== null && typeof v === "object") {
+        out[k] = false;
+        continue;
+      }
       out[k] = sanitizeForAnthropicToolSchema(v);
     }
     return out;
