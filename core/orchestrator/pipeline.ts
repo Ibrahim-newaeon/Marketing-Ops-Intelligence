@@ -29,6 +29,13 @@ import {
   updateApprovalStatus,
   type ApprovalState,
 } from "./state";
+import {
+  initRunStatus,
+  markAgentStarted,
+  markAgentCompleted,
+  markRunTerminal,
+  type PipelineAgent,
+} from "./run_status";
 import { sendWhatsApp } from "../whatsapp/send";
 import { logger } from "../utils/logger";
 import { ResolvedClientContext } from "../schemas";
@@ -43,6 +50,26 @@ export interface RunOptions {
   total_budget_usd_override?: number | undefined;
   run_label?: string | undefined;
   stop_after_plan?: boolean | undefined;   // /generate_plan_only
+  run_id?: string | undefined;             // caller-supplied for async start
+}
+
+/**
+ * Helper to dispatch + track status. Every phase-tracked agent goes
+ * through this so the stepper UI sees current_agent / completed_agents
+ * without each call site repeating the writes.
+ */
+async function dispatchTracked<T>(
+  agentName: PipelineAgent,
+  runId: string,
+  phase: number,
+  phaseName: string,
+  input: Record<string, unknown>,
+  outputKind: string
+): Promise<T> {
+  markAgentStarted(runId, agentName, phase, phaseName);
+  const res = await dispatchAgent<T>(agentName, { runId, input, outputKind });
+  markAgentCompleted(runId, agentName);
+  return res.output;
 }
 
 export interface RunResult {
@@ -93,14 +120,20 @@ async function resolveClientContext(
  * /approve_plan endpoint calling resumeAfterApproval().
  */
 export async function runPhases0to4(opts: RunOptions): Promise<RunResult> {
-  const runId = randomUUID();
+  const runId = opts.run_id ?? randomUUID();
   logger.info({ msg: "pipeline_started", run_id: runId, client_id: opts.client_id });
+  // Progress tracking file — read by /api/pipeline/progress/:run_id.
+  // initRunStatus is idempotent from the async caller's perspective: if
+  // POST /api/pipeline/run has already written the initial status, this
+  // call simply overwrites with the same shape.
+  initRunStatus(runId, opts.client_id);
 
   // ─── Phase 0: client resolution (deterministic, no LLM) ────────────
   let resolved;
   try {
     resolved = await resolveClientContext(opts.client_id, opts.markets_override);
   } catch (err) {
+    markRunTerminal(runId, "blocked", { error: (err as Error).message });
     return {
       run_id: runId,
       client_id: opts.client_id,
@@ -150,11 +183,14 @@ export async function runPhases0to4(opts: RunOptions): Promise<RunResult> {
     retrieval: semanticHits[0]?.retrieval ?? "none",
   });
 
-  const memResult = await dispatchAgent("memory_retrieval_agent", {
+  await dispatchTracked(
+    "memory_retrieval_agent",
     runId,
-    input: { ...baseInput, prefetched_entries: semanticHits, retrieval_query: retrievalQuery },
-    outputKind: "memory_context",
-  });
+    1,
+    "memory_retrieval",
+    { ...baseInput, prefetched_entries: semanticHits, retrieval_query: retrievalQuery },
+    "memory_context"
+  );
   logger.info({ msg: "phase_1_complete", run_id: runId });
 
   // ─── Phase 2: parallel research (or batched if MOI_USE_BATCH=true) ─
@@ -170,16 +206,20 @@ export async function runPhases0to4(opts: RunOptions): Promise<RunResult> {
   ] as const;
   const useBatch = process.env.MOI_USE_BATCH === "true";
   if (useBatch) {
+    // Batched path — all four dispatch at once; mark them all as
+    // in-flight so the stepper shows the quartet spinning together.
+    for (const a of researchAgents) markAgentStarted(runId, a, 2, "research");
     const { dispatchBatch } = await import("./dispatch_batch");
     await dispatchBatch({
       runId,
       outputKind: "research",
       jobs: researchAgents.map((a) => ({ agentName: a, input: phase2Input })),
     });
+    for (const a of researchAgents) markAgentCompleted(runId, a);
   } else {
     await Promise.all(
       researchAgents.map((a) =>
-        dispatchAgent(a, { runId, input: phase2Input, outputKind: "research" })
+        dispatchTracked(a, runId, 2, "research", phase2Input, "research")
       )
     );
   }
@@ -195,32 +235,49 @@ export async function runPhases0to4(opts: RunOptions): Promise<RunResult> {
       keyword: `memory/research/${runId}/keyword_research_agent.json`,
     },
   };
-  const draft = await dispatchAgent("strategy_planner_agent", { runId, input: phase3Input, outputKind: "plans" });
-  const allocated = await dispatchAgent("multi_market_allocator_agent", {
+  await dispatchTracked(
+    "strategy_planner_agent",
     runId,
-    input: { ...phase3Input, plan_draft_ref: `memory/plans/${runId}/strategy_planner_agent.json` },
-    outputKind: "plans",
-  });
-  const optimized = await dispatchAgent("budget_optimizer_agent", {
+    3,
+    "planning",
+    phase3Input,
+    "plans"
+  );
+  await dispatchTracked(
+    "multi_market_allocator_agent",
     runId,
-    input: { ...phase3Input, allocated_plan_ref: `memory/plans/${runId}/multi_market_allocator_agent.json` },
-    outputKind: "plans",
-  });
+    3,
+    "planning",
+    { ...phase3Input, plan_draft_ref: `memory/plans/${runId}/strategy_planner_agent.json` },
+    "plans"
+  );
+  await dispatchTracked(
+    "budget_optimizer_agent",
+    runId,
+    3,
+    "planning",
+    { ...phase3Input, allocated_plan_ref: `memory/plans/${runId}/multi_market_allocator_agent.json` },
+    "plans"
+  );
   logger.info({ msg: "phase_3_complete", run_id: runId });
 
   // ─── Phase 4: approval validation ──────────────────────────────────
-  const handoff = await dispatchAgent("approval_manager_agent", {
-    runId,
-    input: { ...phase3Input, strategy_plan_ref: `memory/plans/${runId}/budget_optimizer_agent.json` },
-    outputKind: "approvals",
-  });
-
-  const hand = handoff.output as {
+  const hand = await dispatchTracked<{
     plan_version: string;
     requires_legal_review: boolean;
     status: string;
-  };
+  }>(
+    "approval_manager_agent",
+    runId,
+    4,
+    "approval_validation",
+    { ...phase3Input, strategy_plan_ref: `memory/plans/${runId}/budget_optimizer_agent.json` },
+    "approvals"
+  );
   if (hand.status !== "ready_for_human_review") {
+    markRunTerminal(runId, "failed", {
+      error: `approval_manager_status=${hand.status}`,
+    });
     return {
       run_id: runId,
       client_id: opts.client_id,
@@ -252,6 +309,7 @@ export async function runPhases0to4(opts: RunOptions): Promise<RunResult> {
 
   if (opts.stop_after_plan) {
     logger.info({ msg: "plan_only_halt", run_id: runId });
+    markRunTerminal(runId, "awaiting_approval", { plan_version: hand.plan_version });
     return {
       run_id: runId,
       client_id: opts.client_id,
@@ -269,6 +327,7 @@ export async function runPhases0to4(opts: RunOptions): Promise<RunResult> {
     logger.warn({ msg: "wa_plan_ready_send_failed", run_id: runId, err: (err as Error).message });
   }
 
+  markRunTerminal(runId, "awaiting_approval", { plan_version: hand.plan_version });
   return {
     run_id: runId,
     client_id: opts.client_id,

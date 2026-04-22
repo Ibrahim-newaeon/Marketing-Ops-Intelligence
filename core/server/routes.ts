@@ -14,6 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Express, Request, Response } from "express";
+import { randomUUID } from "node:crypto";
 import { requireAuth, requirePrincipal, loginHandler, logoutHandler } from "../auth/middleware";
 import { runPhases0to4, resumeAfterApproval } from "../orchestrator/pipeline";
 import {
@@ -22,6 +23,13 @@ import {
   updateApprovalStatus,
   cancelApprovalTimer,
 } from "../orchestrator/state";
+import {
+  initRunStatus,
+  readRunStatus,
+  markRunTerminal,
+  PIPELINE_AGENTS,
+} from "../orchestrator/run_status";
+import { logger } from "../utils/logger";
 import { ClientProfile } from "../schemas";
 import { verifyChallenge, handleWebhook } from "../whatsapp/webhook_handler";
 import { query } from "../db/client";
@@ -133,7 +141,11 @@ export function mountRoutes(app: Express): void {
   });
 
   // ─── Pipeline ──────────────────────────────────────────────────────
-  app.post("/api/pipeline/run", requirePrincipal, async (req, res) => {
+  // POST is fire-and-forget. Returns run_id within ~100ms after writing
+  // the initial status file; the pipeline itself runs in the background
+  // and writes progress into memory/runs/<run_id>/status.json. Frontend
+  // polls GET /api/pipeline/progress/:run_id for the stepper.
+  app.post("/api/pipeline/run", requirePrincipal, (req, res) => {
     const body = req.body as {
       client_id?: string;
       markets_override?: string[];
@@ -144,18 +156,41 @@ export function mountRoutes(app: Express): void {
     if (!body?.client_id) {
       return res.status(400).json({ ok: false, code: "client_id_required" });
     }
-    try {
-      const result = await runPhases0to4({
-        client_id: body.client_id,
-        markets_override: body.markets_override,
-        total_budget_usd_override: body.total_budget_usd_override,
-        run_label: body.run_label,
-        stop_after_plan: body.stop_after_plan ?? false,
+    const runId = randomUUID();
+    initRunStatus(runId, body.client_id);
+    // Kick off the pipeline — do NOT await. Any failure is captured
+    // into the run-status file so the dashboard surfaces it; HTTP call
+    // has already returned.
+    void runPhases0to4({
+      client_id: body.client_id,
+      markets_override: body.markets_override,
+      total_budget_usd_override: body.total_budget_usd_override,
+      run_label: body.run_label,
+      stop_after_plan: body.stop_after_plan ?? false,
+      run_id: runId,
+    }).catch((err) => {
+      logger.error({
+        msg: "pipeline_failed_async",
+        run_id: runId,
+        err: (err as Error).message,
       });
-      res.json(result);
-    } catch (err) {
-      res.status(500).json({ ok: false, code: "pipeline_failed", detail: (err as Error).message });
+      markRunTerminal(runId, "failed", { error: (err as Error).message });
+    });
+    res.status(202).json({ run_id: runId, status: "running" });
+  });
+
+  // Progress polling for the stepper UI. Returns the full run-status
+  // plus the canonical agent order so the frontend doesn't hardcode it.
+  app.get("/api/pipeline/progress/:run_id", (req, res) => {
+    const s = readRunStatus(req.params.run_id);
+    if (!s) {
+      return res.status(404).json({ ok: false, code: "no_run_status" });
     }
+    res.json({
+      ...s,
+      agent_order: PIPELINE_AGENTS,
+      elapsed_ms: Date.now() - new Date(s.started_at).getTime(),
+    });
   });
 
   // ─── Approvals ─────────────────────────────────────────────────────

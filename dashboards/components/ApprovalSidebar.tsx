@@ -16,6 +16,7 @@ import {
   type DashboardContextPending,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { PipelineStepper } from "./PipelineStepper";
 
 function hoursUntil(iso: string): number {
   return (new Date(iso).getTime() - Date.now()) / 3_600_000;
@@ -172,6 +173,9 @@ export function ApprovalSidebar(): JSX.Element {
   const [runningId, setRunningId] = useState<string | null>(null);
   const [runMsg, setRunMsg] = useState<{ id: string; text: string; tone: "ok" | "err" } | null>(null);
   const [auth, setAuth] = useState<AuthStatus | null>(null);
+  // Active run_id being watched by the stepper. Set when POST returns,
+  // cleared when the stepper reports a terminal status.
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
 
   const load = (): void => {
     getDashboardContext()
@@ -258,6 +262,7 @@ export function ApprovalSidebar(): JSX.Element {
     setRunMsg(null);
     try {
       const r = await runPipeline(clientId, true);
+      if (r.run_id) setActiveRunId(r.run_id);
       setRunMsg({
         id: clientId,
         text: r.run_id ? `run ${r.run_id.slice(0, 8)}… started` : "run started",
@@ -323,6 +328,22 @@ export function ApprovalSidebar(): JSX.Element {
           className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive"
         >
           {err}
+        </div>
+      )}
+
+      {activeRunId && (
+        <div className="mt-3" data-testid="sidebar-stepper-slot">
+          <PipelineStepper
+            runId={activeRunId}
+            onTerminal={() => {
+              // Reload dashboard context so the PendingCard populates
+              // (if status is awaiting_approval) and recent_runs updates.
+              load();
+              // Clear after a short delay so the user sees the final
+              // state before the stepper collapses.
+              setTimeout(() => setActiveRunId(null), 4_000);
+            }}
+          />
         </div>
       )}
 
@@ -425,7 +446,11 @@ export function ApprovalSidebar(): JSX.Element {
                   type="button"
                   data-testid={`sidebar-client-run-${c.id}`}
                   onClick={() => void onRun(c.id)}
-                  disabled={isRunning || Boolean(ctx?.pending_approval)}
+                  disabled={
+                    isRunning ||
+                    Boolean(activeRunId) ||
+                    Boolean(ctx?.pending_approval)
+                  }
                   aria-label={`Run pipeline for ${c.id}`}
                   className={cn(
                     "flex-1 rounded-md border px-2 py-1 text-[11px] font-semibold transition",
@@ -433,7 +458,13 @@ export function ApprovalSidebar(): JSX.Element {
                     "disabled:cursor-not-allowed disabled:opacity-50"
                   )}
                 >
-                  {isRunning ? "Starting…" : ctx?.pending_approval ? "Pending" : "Run"}
+                  {isRunning
+                    ? "Starting…"
+                    : activeRunId
+                      ? "Running…"
+                      : ctx?.pending_approval
+                        ? "Pending"
+                        : "Run"}
                 </button>
                 <button
                   type="button"

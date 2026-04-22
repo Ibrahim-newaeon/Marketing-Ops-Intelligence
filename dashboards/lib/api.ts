@@ -119,6 +119,49 @@ export async function runPipeline(
   });
 }
 
+export type PipelineAgent =
+  | "memory_retrieval_agent"
+  | "market_research_agent"
+  | "competitor_intel_agent"
+  | "audience_insights_agent"
+  | "keyword_research_agent"
+  | "strategy_planner_agent"
+  | "multi_market_allocator_agent"
+  | "budget_optimizer_agent"
+  | "approval_manager_agent";
+
+export type PipelineRunStatus =
+  | "running"
+  | "awaiting_approval"
+  | "plan_only_halted"
+  | "failed"
+  | "blocked";
+
+export interface PipelineProgress {
+  run_id: string;
+  client_id: string;
+  started_at: string;
+  updated_at: string;
+  phase: number;
+  phase_name: string;
+  current_agent: PipelineAgent | null;
+  completed_agents: PipelineAgent[];
+  status: PipelineRunStatus;
+  error?: { message: string; at: string };
+  plan_version?: string;
+  agent_order: PipelineAgent[];
+  elapsed_ms: number;
+}
+
+export async function getPipelineProgress(runId: string): Promise<PipelineProgress | null> {
+  try {
+    return await request<PipelineProgress>(`/api/pipeline/progress/${encodeURIComponent(runId)}`);
+  } catch (e) {
+    if (/\b404\b/.test((e as Error).message)) return null;
+    throw e;
+  }
+}
+
 export async function approveRun(run_id: string, plan_version?: string): Promise<unknown> {
   return request<unknown>(`/api/approvals/${encodeURIComponent(run_id)}/approve`, {
     method: "POST",
