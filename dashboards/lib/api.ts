@@ -5,11 +5,14 @@
  */
 import type { DashboardPayload, TabSlug } from "@schemas/dashboard";
 
-// Server-side (SSR): reach Express on the same container via 127.0.0.1:$PORT.
+// Server-side (SSR): reach Express on the same container via
+// 127.0.0.1:$INTERNAL_API_PORT. We can't use process.env.PORT here — Next.js
+// overwrites it with its own listening port (DASHBOARD_PORT=4000), which
+// would cause SSR to fetch Next.js itself and get an HTML 404.
 // Client-side (browser): use relative URLs so requests go to the same origin.
 const API_BASE =
   typeof window === "undefined"
-    ? `http://127.0.0.1:${process.env.PORT ?? 3000}`
+    ? `http://127.0.0.1:${process.env.INTERNAL_API_PORT ?? process.env.PORT ?? 3000}`
     : "";
 
 export type TabData = DashboardPayload["tabs"][TabSlug];
