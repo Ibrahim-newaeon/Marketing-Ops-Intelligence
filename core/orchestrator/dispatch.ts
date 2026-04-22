@@ -38,20 +38,66 @@ const MEMORY = path.join(ROOT, "memory");
  * Also guards against format/pattern keywords that occasionally trip the
  * validator for generated schemas.
  */
+// Anthropic's tool input_schema is a strict subset of JSON Schema. It
+// tracks OpenAI strict-mode more than raw Draft 7 / 2020-12. Anything
+// outside this set either errors at the API or is silently ignored,
+// so we strip aggressively. Errors seen in production so far:
+//   tools.0.custom: For 'number' type, properties maximum, minimum are not supported
+//   tools.0.custom: For 'object' type, 'additionalProperties: object' is not supported
+//   tools.0.custom: For 'object' type, property 'propertyNames' is not supported
+//   tools.0.custom: Invalid schema: Reference to non-existent definition: #/...
+// `additionalProperties` when object-shaped is coerced to `false` below;
+// `$ref` is inlined upstream via zodToJsonSchema({ $refStrategy: "none" }).
 const UNSUPPORTED_SCHEMA_KEYS = new Set([
+  // — Numeric validators —
   "minimum",
   "maximum",
   "exclusiveMinimum",
   "exclusiveMaximum",
   "multipleOf",
+  // — String validators —
   "minLength",
   "maxLength",
+  "pattern",
+  "format",
+  "contentEncoding",
+  "contentMediaType",
+  "contentSchema",
+  // — Array validators —
   "minItems",
   "maxItems",
   "uniqueItems",
-  "pattern",
-  "format",
+  "contains",
+  "minContains",
+  "maxContains",
+  "prefixItems",
+  "unevaluatedItems",
+  // — Object validators (additionalProperties handled separately) —
+  "minProperties",
+  "maxProperties",
+  "patternProperties",
+  "propertyNames",
+  "dependentRequired",
+  "dependentSchemas",
+  "dependencies",
+  "unevaluatedProperties",
+  // — Conditional / combinator edges (anyOf/oneOf/allOf kept) —
+  "if",
+  "then",
+  "else",
+  // — Defaults / annotations Anthropic ignores or rejects —
   "default",
+  "examples",
+  "readOnly",
+  "writeOnly",
+  "deprecated",
+  // — Schema metadata that leaks from zod-to-json-schema envelopes —
+  "$schema",
+  "$id",
+  "$anchor",
+  "$comment",
+  "$defs",
+  "definitions",
 ]);
 
 export function sanitizeForAnthropicToolSchema(node: unknown): unknown {
