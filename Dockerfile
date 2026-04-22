@@ -24,6 +24,10 @@ COPY --from=build --chown=app:app /app/dist ./dist
 # Migrations are raw SQL — tsc doesn't emit them. Place them next to the
 # compiled migrate.js so __dirname/migrations resolves correctly.
 COPY --from=build --chown=app:app /app/core/db/migrations ./dist/core/db/migrations
+# Agent definitions are markdown + frontmatter, not TS. agent_loader.ts
+# resolves them as `<__dirname>/../../.claude/agents/*.md`, which maps to
+# `dist/.claude/agents/` at runtime — mirror the layout into dist.
+COPY --from=build --chown=app:app /app/.claude/agents ./dist/.claude/agents
 COPY --from=build --chown=app:app /app/node_modules ./node_modules
 COPY --from=build --chown=app:app /app/package.json ./package.json
 COPY --from=build --chown=app:app /app/dashboards/.next ./dashboards/.next
