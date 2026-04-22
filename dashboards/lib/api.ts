@@ -78,3 +78,87 @@ export interface DashboardContext {
 export async function getDashboardContext(): Promise<DashboardContext> {
   return request<DashboardContext>("/api/dashboard/context");
 }
+
+export interface RunPipelineResponse {
+  run_id?: string;
+  status?: string;
+  plan_version?: string;
+  [k: string]: unknown;
+}
+
+export async function runPipeline(
+  client_id: string,
+  stop_after_plan = true
+): Promise<RunPipelineResponse> {
+  return request<RunPipelineResponse>("/api/pipeline/run", {
+    method: "POST",
+    body: JSON.stringify({ client_id, stop_after_plan }),
+  });
+}
+
+export async function approveRun(run_id: string, plan_version?: string): Promise<unknown> {
+  return request<unknown>(`/api/approvals/${encodeURIComponent(run_id)}/approve`, {
+    method: "POST",
+    body: JSON.stringify(plan_version ? { plan_version } : {}),
+  });
+}
+
+export async function editRun(run_id: string, feedback: string): Promise<unknown> {
+  return request<unknown>(`/api/approvals/${encodeURIComponent(run_id)}/edit`, {
+    method: "POST",
+    body: JSON.stringify({ feedback }),
+  });
+}
+
+export async function declineRun(run_id: string, reason: string): Promise<unknown> {
+  return request<unknown>(`/api/approvals/${encodeURIComponent(run_id)}/decline`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function getClientProfile(id: string): Promise<unknown> {
+  return request<unknown>(`/api/clients/${encodeURIComponent(id)}`);
+}
+
+export interface ClientsExport {
+  clients: unknown[];
+  exported_at: string;
+  count: number;
+}
+
+export async function exportAllClients(): Promise<ClientsExport> {
+  return request<ClientsExport>("/api/clients/export");
+}
+
+export interface CreateClientResponse {
+  ok: boolean;
+  client_id: string;
+  overwritten?: boolean;
+}
+
+export async function createClient(
+  profile: unknown,
+  overwrite = false
+): Promise<CreateClientResponse> {
+  return request<CreateClientResponse>(
+    `/api/clients${overwrite ? "?overwrite=true" : ""}`,
+    {
+      method: "POST",
+      body: JSON.stringify(profile),
+    }
+  );
+}
+
+// Triggers a browser download for an arbitrary JSON payload.
+export function downloadJson(filename: string, data: unknown): void {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

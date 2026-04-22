@@ -31,11 +31,11 @@ import {
 } from "./state";
 import { sendWhatsApp } from "../whatsapp/send";
 import { logger } from "../utils/logger";
-import { ClientProfile, ResolvedClientContext } from "../schemas";
+import { ResolvedClientContext } from "../schemas";
 import { semanticRetrieve } from "../memory/semantic_retrieve";
+import { getClient } from "../db/clients";
 
 const ROOT = path.resolve(__dirname, "..", "..");
-const CLIENTS_DIR = path.join(ROOT, "config", "clients");
 
 export interface RunOptions {
   client_id: string;
@@ -54,26 +54,14 @@ export interface RunResult {
   message: string;
 }
 
-/**
- * Load ClientProfile from disk. Throws if absent or invalid.
- * (Mirrors client_resolver_agent phase-0 contract; kept local because
- * phase 0 is deterministic file I/O + schema validation — doesn't need
- * an LLM call.)
- */
-function loadClientProfile(clientId: string): ReturnType<typeof ClientProfile.parse> {
-  const file = path.join(CLIENTS_DIR, `${clientId}.json`);
-  if (!fs.existsSync(file)) {
-    throw new Error(`config/clients/${clientId}.json not found`);
-  }
-  const raw = JSON.parse(fs.readFileSync(file, "utf8"));
-  return ClientProfile.parse(raw);
-}
-
-function resolveClientContext(
+async function resolveClientContext(
   clientId: string,
   override?: string[]
-): ReturnType<typeof ResolvedClientContext.parse> {
-  const client = loadClientProfile(clientId);
+): Promise<ReturnType<typeof ResolvedClientContext.parse>> {
+  const client = await getClient(clientId);
+  if (!client) {
+    throw new Error(`client ${clientId} not found (db or config/clients/)`);
+  }
   const selected = override ?? client.default_markets;
   if (selected.length === 0) {
     throw new Error(
@@ -111,7 +99,7 @@ export async function runPhases0to4(opts: RunOptions): Promise<RunResult> {
   // ─── Phase 0: client resolution (deterministic, no LLM) ────────────
   let resolved;
   try {
-    resolved = resolveClientContext(opts.client_id, opts.markets_override);
+    resolved = await resolveClientContext(opts.client_id, opts.markets_override);
   } catch (err) {
     return {
       run_id: runId,

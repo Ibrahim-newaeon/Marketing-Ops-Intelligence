@@ -9,6 +9,18 @@ set -e
 export DASHBOARD_PORT=4000
 export INTERNAL_API_PORT=${PORT:-3000}
 
+# Run DB migrations before anything else if DATABASE_URL is set. Idempotent
+# — migrate.js tracks applied filenames in schema_migrations.
+if [ -n "$DATABASE_URL" ]; then
+  echo "[entrypoint] running db migrations"
+  node dist/core/db/migrate.js || {
+    echo "[entrypoint] db migrations failed — aborting"
+    exit 1
+  }
+else
+  echo "[entrypoint] DATABASE_URL not set — skipping migrations (clients adapter will fall back to filesystem)"
+fi
+
 echo "[entrypoint] starting Next.js dashboard on port $DASHBOARD_PORT (INTERNAL_API_PORT=$INTERNAL_API_PORT)"
 npx next start dashboards -p $DASHBOARD_PORT &
 NEXT_PID=$!

@@ -17,6 +17,7 @@ import { helmetStrict, apiRateLimit, errorHandler } from "../auth/middleware";
 import { mountRoutes } from "./routes";
 import { startTimerPoller } from "../orchestrator/timer";
 import { logger } from "../utils/logger";
+import { seedFromFilesystemIfEmpty } from "../db/clients";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const DASHBOARD_PORT = Number(process.env.DASHBOARD_PORT ?? 3001);
@@ -82,7 +83,19 @@ export function createApp(): express.Express {
   return app;
 }
 
-function main(): void {
+async function main(): Promise<void> {
+  // One-shot: seed the DB clients table from config/clients/*.json if the
+  // table is empty. Survives the first post-Postgres deploy where profiles
+  // still only exist on disk. No-op in subsequent deploys.
+  if (process.env.DATABASE_URL) {
+    try {
+      const seeded = await seedFromFilesystemIfEmpty();
+      if (seeded > 0) logger.info({ msg: "clients_seeded_from_fs", count: seeded });
+    } catch (err) {
+      logger.warn({ msg: "clients_seed_failed", err: (err as Error).message });
+    }
+  }
+
   const app = createApp();
   startTimerPoller();
   app.listen(PORT, () => {
@@ -95,4 +108,9 @@ const isMain =
   typeof require !== "undefined" &&
   typeof module !== "undefined" &&
   require.main === module;
-if (isMain) main();
+if (isMain) {
+  main().catch((err) => {
+    logger.error({ msg: "server_boot_failed", err: (err as Error).message });
+    process.exit(1);
+  });
+}

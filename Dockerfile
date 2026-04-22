@@ -21,6 +21,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=build --chown=app:app /app/dist ./dist
+# Migrations are raw SQL — tsc doesn't emit them. Place them next to the
+# compiled migrate.js so __dirname/migrations resolves correctly.
+COPY --from=build --chown=app:app /app/core/db/migrations ./dist/core/db/migrations
 COPY --from=build --chown=app:app /app/node_modules ./node_modules
 COPY --from=build --chown=app:app /app/package.json ./package.json
 COPY --from=build --chown=app:app /app/dashboards/.next ./dashboards/.next
