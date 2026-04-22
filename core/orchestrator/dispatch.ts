@@ -115,10 +115,16 @@ export async function dispatchAgent<T = unknown>(
   const claudeMd = getClaudeMd();
 
   // JSON schema for the single structured-output tool. zod-to-json-schema
-  // returns a $schema-wrapped object; strip the envelope, keep the object
-  // schema the tool expects.
+  // returns a $schema-wrapped object with a top-level $ref into
+  // `definitions`. Anthropic's tool input_schema must be self-contained —
+  // if we pluck the inner definition we strand any `#/definitions/...`
+  // refs emitted for repeated/recursive Zod shapes. $refStrategy:"none"
+  // inlines every subschema so the unwrapped result has zero $refs.
   // @ts-expect-error — zod-to-json-schema deep instantiation is safe at runtime
-  const jsonSchemaRaw = zodToJsonSchema(schema, { name: `${agentName}_output` }) as {
+  const jsonSchemaRaw = zodToJsonSchema(schema, {
+    name: `${agentName}_output`,
+    $refStrategy: "none",
+  }) as {
     definitions?: Record<string, unknown>;
     $ref?: string;
     $schema?: string;

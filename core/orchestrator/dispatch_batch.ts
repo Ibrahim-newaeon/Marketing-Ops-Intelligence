@@ -54,7 +54,13 @@ function buildRequest(runId: string, job: BatchJob): BatchRequest {
   const model = resolveModel(job.agentName);
   const schema = getAgentSchema(job.agentName);
 
-  const jsonSchemaRaw = zodToJsonSchema(schema, { name: `${job.agentName}_output` }) as {
+  // Inline every $ref — Anthropic's tool input_schema is self-contained
+  // and we strip the `definitions` wrapper below. See dispatch.ts for
+  // the detailed rationale.
+  const jsonSchemaRaw = zodToJsonSchema(schema, {
+    name: `${job.agentName}_output`,
+    $refStrategy: "none",
+  }) as {
     definitions?: Record<string, unknown>;
     $ref?: string;
   };
