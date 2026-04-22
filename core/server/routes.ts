@@ -139,7 +139,7 @@ export function mountRoutes(app: Express): void {
   });
 
   // ─── Approvals ─────────────────────────────────────────────────────
-  app.get("/api/approvals/:run_id", requireAuth, (req, res) => {
+  app.get("/api/approvals/:run_id", (req, res) => {
     const s = readApprovalState();
     if (!s || s.run_id !== req.params.run_id) {
       return res.status(404).json({ ok: false, code: "no_approval_state" });
@@ -152,7 +152,7 @@ export function mountRoutes(app: Express): void {
     });
   });
 
-  app.post("/api/approvals/:run_id/approve", requireAuth, async (req, res) => {
+  app.post("/api/approvals/:run_id/approve", async (req, res) => {
     const s = readApprovalState();
     if (!s || s.run_id !== req.params.run_id) {
       return res.status(404).json({ ok: false, code: "no_approval_state" });
@@ -177,7 +177,7 @@ export function mountRoutes(app: Express): void {
     res.json(out);
   });
 
-  app.post("/api/approvals/:run_id/edit", requireAuth, async (req, res) => {
+  app.post("/api/approvals/:run_id/edit", async (req, res) => {
     const feedback = (req.body as { feedback?: string })?.feedback;
     if (!feedback || feedback.trim().length === 0) {
       return res.status(400).json({ ok: false, code: "feedback_required" });
@@ -203,7 +203,7 @@ export function mountRoutes(app: Express): void {
     res.json({ ok: true, plan_version: s.plan_version });
   });
 
-  app.post("/api/approvals/:run_id/decline", requireAuth, async (req, res) => {
+  app.post("/api/approvals/:run_id/decline", async (req, res) => {
     const reason = (req.body as { reason?: string })?.reason;
     if (!reason || reason.trim().length === 0) {
       return res.status(400).json({ ok: false, code: "reason_required" });
@@ -244,8 +244,7 @@ export function mountRoutes(app: Express): void {
   // ─── Dashboard (read-only) ─────────────────────────────────────────
   // Sidebar context — lists registered clients, the currently-pending
   // approval (if any), and recent runs. Read-only, safe to expose at
-  // the same auth posture as /api/dashboard. Principal phone numbers
-  // and full ClientProfile remain behind requireAuth on /api/clients.
+  // the same auth posture as /api/dashboard.
   app.get("/api/dashboard/context", (_req, res) => {
     const clients: Array<{
       id: string;

@@ -96,6 +96,27 @@ export async function runPipeline(
   });
 }
 
+export async function approveRun(run_id: string, plan_version?: string): Promise<unknown> {
+  return request<unknown>(`/api/approvals/${encodeURIComponent(run_id)}/approve`, {
+    method: "POST",
+    body: JSON.stringify(plan_version ? { plan_version } : {}),
+  });
+}
+
+export async function editRun(run_id: string, feedback: string): Promise<unknown> {
+  return request<unknown>(`/api/approvals/${encodeURIComponent(run_id)}/edit`, {
+    method: "POST",
+    body: JSON.stringify({ feedback }),
+  });
+}
+
+export async function declineRun(run_id: string, reason: string): Promise<unknown> {
+  return request<unknown>(`/api/approvals/${encodeURIComponent(run_id)}/decline`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
 export async function getClientProfile(id: string): Promise<unknown> {
   return request<unknown>(`/api/clients/${encodeURIComponent(id)}`);
 }

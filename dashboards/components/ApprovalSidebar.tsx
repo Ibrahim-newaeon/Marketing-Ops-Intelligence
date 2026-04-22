@@ -7,6 +7,9 @@ import {
   exportAllClients,
   createClient,
   downloadJson,
+  approveRun,
+  editRun,
+  declineRun,
   type DashboardContext,
   type DashboardContextPending,
 } from "@/lib/api";
@@ -23,13 +26,65 @@ function fmtCountdown(hours: number): { text: string; tone: "ok" | "warn" | "exp
   return { text: `${Math.round(hours)} h`, tone: "ok" };
 }
 
-function PendingCard({ p }: { p: DashboardContextPending }): JSX.Element {
+function PendingCard({ p, onChanged }: { p: DashboardContextPending; onChanged: () => void }): JSX.Element {
   const [hours, setHours] = useState(hoursUntil(p.expires_at));
+  const [busy, setBusy] = useState<"approve" | "edit" | "decline" | null>(null);
+  const [msg, setMsg] = useState<{ text: string; tone: "ok" | "err" } | null>(null);
+
   useEffect(() => {
     const t = setInterval(() => setHours(hoursUntil(p.expires_at)), 30_000);
     return () => clearInterval(t);
   }, [p.expires_at]);
   const c = fmtCountdown(hours);
+
+  const onApprove = async (): Promise<void> => {
+    setBusy("approve");
+    setMsg(null);
+    try {
+      await approveRun(p.run_id, p.plan_version);
+      setMsg({ text: "approved — execution starting", tone: "ok" });
+      onChanged();
+    } catch (e) {
+      setMsg({ text: (e as Error).message, tone: "err" });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onEdit = async (): Promise<void> => {
+    const feedback = window.prompt("Feedback for the planner (will bump plan version):");
+    if (!feedback || !feedback.trim()) return;
+    setBusy("edit");
+    setMsg(null);
+    try {
+      await editRun(p.run_id, feedback.trim());
+      setMsg({ text: "feedback sent — plan re-version bumped", tone: "ok" });
+      onChanged();
+    } catch (e) {
+      setMsg({ text: (e as Error).message, tone: "err" });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onDecline = async (): Promise<void> => {
+    const reason = window.prompt("Reason for declining (required):");
+    if (!reason || !reason.trim()) return;
+    if (!window.confirm(`Decline plan ${p.plan_version} for ${p.client_id}?`)) return;
+    setBusy("decline");
+    setMsg(null);
+    try {
+      await declineRun(p.run_id, reason.trim());
+      setMsg({ text: "declined", tone: "ok" });
+      onChanged();
+    } catch (e) {
+      setMsg({ text: (e as Error).message, tone: "err" });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const disabled = busy !== null;
   return (
     <div
       data-testid="sidebar-pending-card"
@@ -61,9 +116,50 @@ function PendingCard({ p }: { p: DashboardContextPending }): JSX.Element {
       >
         {c.tone === "expired" ? "timeout window expired" : `${c.text} left in 48 h window`}
       </div>
-      <div className="mt-2 text-[10px] text-amber-800/80">
-        Approve, edit, or decline via slash command or <span className="font-mono">POST /api/approvals/:run_id/*</span>.
+      <div className="mt-3 grid grid-cols-3 gap-1">
+        <button
+          type="button"
+          data-testid="sidebar-pending-approve"
+          onClick={() => void onApprove()}
+          disabled={disabled || c.tone === "expired"}
+          aria-label="Approve plan"
+          className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-800 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy === "approve" ? "…" : "Approve"}
+        </button>
+        <button
+          type="button"
+          data-testid="sidebar-pending-edit"
+          onClick={() => void onEdit()}
+          disabled={disabled}
+          aria-label="Send edit feedback"
+          className="rounded-md border border-amber-500/40 bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-900 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy === "edit" ? "…" : "Edit"}
+        </button>
+        <button
+          type="button"
+          data-testid="sidebar-pending-decline"
+          onClick={() => void onDecline()}
+          disabled={disabled}
+          aria-label="Decline plan"
+          className="rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-[11px] font-semibold text-destructive transition hover:bg-destructive/20 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy === "decline" ? "…" : "Decline"}
+        </button>
       </div>
+      {msg && (
+        <div
+          data-testid="sidebar-pending-action-msg"
+          role="status"
+          className={cn(
+            "mt-2 text-[10px]",
+            msg.tone === "ok" ? "text-emerald-700" : "text-destructive"
+          )}
+        >
+          {msg.text}
+        </div>
+      )}
     </div>
   );
 }
@@ -188,7 +284,7 @@ export function ApprovalSidebar(): JSX.Element {
 
       <div className="mt-3" data-testid="sidebar-pending-slot">
         {ctx?.pending_approval ? (
-          <PendingCard p={ctx.pending_approval} />
+          <PendingCard p={ctx.pending_approval} onChanged={load} />
         ) : (
           <div
             data-testid="sidebar-pending-empty"
