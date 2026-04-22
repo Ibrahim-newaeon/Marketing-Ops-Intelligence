@@ -72,6 +72,27 @@ async function dispatchTracked<T>(
   return res.output;
 }
 
+/**
+ * Read an upstream artifact (a JSON file under memory/) and return its
+ * parsed contents. Agents only have the emit_output tool, no Read tool,
+ * so anything we pass as a ref is invisible to them. Inline the content
+ * via this helper so downstream agents actually build on upstream work
+ * instead of hallucinating plausible JSON.
+ *
+ * Returns null when the file is missing — caller decides whether that's
+ * fatal or tolerable (research artifacts are expected; optional ones
+ * like memory_context on first_run are not).
+ */
+function readArtifact(relPath: string): unknown {
+  const full = path.join(ROOT, relPath);
+  if (!fs.existsSync(full)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(full, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
 export interface RunResult {
   run_id: string;
   client_id: string;
@@ -226,14 +247,25 @@ export async function runPhases0to4(opts: RunOptions): Promise<RunResult> {
   logger.info({ msg: "phase_2_complete", run_id: runId, mode: useBatch ? "batch" : "realtime" });
 
   // ─── Phase 3: planning (serial) ────────────────────────────────────
+  // Inline the research artifacts so the planner sees actual findings,
+  // not unreadable file-path refs. We also keep the refs as metadata
+  // (useful for audit + debugging).
+  const researchArtifacts = {
+    market: readArtifact(`memory/research/${runId}/market_research_agent.json`),
+    competitor: readArtifact(`memory/research/${runId}/competitor_intel_agent.json`),
+    audience: readArtifact(`memory/research/${runId}/audience_insights_agent.json`),
+    keyword: readArtifact(`memory/research/${runId}/keyword_research_agent.json`),
+  };
   const phase3Input = {
     ...phase2Input,
-    research: {
+    research: researchArtifacts,
+    research_refs: {
       market: `memory/research/${runId}/market_research_agent.json`,
       competitor: `memory/research/${runId}/competitor_intel_agent.json`,
       audience: `memory/research/${runId}/audience_insights_agent.json`,
       keyword: `memory/research/${runId}/keyword_research_agent.json`,
     },
+    resolved_client: resolved,
   };
   await dispatchTracked(
     "strategy_planner_agent",
@@ -248,7 +280,11 @@ export async function runPhases0to4(opts: RunOptions): Promise<RunResult> {
     runId,
     3,
     "planning",
-    { ...phase3Input, plan_draft_ref: `memory/plans/${runId}/strategy_planner_agent.json` },
+    {
+      ...phase3Input,
+      plan_draft: readArtifact(`memory/plans/${runId}/strategy_planner_agent.json`),
+      plan_draft_ref: `memory/plans/${runId}/strategy_planner_agent.json`,
+    },
     "plans"
   );
   await dispatchTracked(
@@ -256,34 +292,54 @@ export async function runPhases0to4(opts: RunOptions): Promise<RunResult> {
     runId,
     3,
     "planning",
-    { ...phase3Input, allocated_plan_ref: `memory/plans/${runId}/multi_market_allocator_agent.json` },
+    {
+      ...phase3Input,
+      allocated_plan: readArtifact(`memory/plans/${runId}/multi_market_allocator_agent.json`),
+      allocated_plan_ref: `memory/plans/${runId}/multi_market_allocator_agent.json`,
+    },
     "plans"
   );
   logger.info({ msg: "phase_3_complete", run_id: runId });
 
   // ─── Phase 4: approval validation ──────────────────────────────────
+  // Approval agent is the one enforcing validation honestly — give it
+  // the full upstream context inline so it can actually validate.
   const hand = await dispatchTracked<{
     plan_version: string;
     requires_legal_review: boolean;
     status: string;
+    missing_data?: string[];
   }>(
     "approval_manager_agent",
     runId,
     4,
     "approval_validation",
-    { ...phase3Input, strategy_plan_ref: `memory/plans/${runId}/budget_optimizer_agent.json` },
+    {
+      ...phase3Input,
+      strategy_plan: readArtifact(
+        `memory/plans/${runId}/budget_optimizer_agent.json`
+      ),
+      strategy_plan_ref: `memory/plans/${runId}/budget_optimizer_agent.json`,
+      memory_context: readArtifact(
+        `memory/memory_context/${runId}/memory_retrieval_agent.json`
+      ),
+    },
     "approvals"
   );
   if (hand.status !== "ready_for_human_review") {
-    markRunTerminal(runId, "failed", {
-      error: `approval_manager_status=${hand.status}`,
-    });
+    const md = Array.isArray(hand.missing_data) ? hand.missing_data : [];
+    const preview = md.slice(0, 3).join("; ");
+    const errorMsg =
+      `approval_manager_status=${hand.status}` +
+      (preview ? ` — ${preview}` : "") +
+      (md.length > 3 ? ` (+${md.length - 3} more)` : "");
+    markRunTerminal(runId, "failed", { error: errorMsg });
     return {
       run_id: runId,
       client_id: opts.client_id,
       phase_reached: 4,
       status: "error",
-      missing_data: [`approval_manager_status=${hand.status}`],
+      missing_data: md.length > 0 ? md : [`approval_manager_status=${hand.status}`],
       message: "approval validation failed",
     };
   }
