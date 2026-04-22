@@ -5,8 +5,11 @@
  *   - Loads the agent definition from .claude/agents/<name>.md
  *   - Builds system prompt = [CLAUDE.md (cached), agent body (cached)]
  *   - Converts the agent's Zod output schema to a JSON schema
- *   - Forces a single tool call (`emit_output`, strict:true) to get
- *     structured output
+ *   - Forces a single tool call (`emit_output`) to get structured
+ *     output. `strict: true` is intentionally OFF — grammar compilation
+ *     blows up on large agent schemas ("The compiled grammar is too
+ *     large") and we already Zod-validate the tool_use input below,
+ *     which gives us the same guarantee at lower cost.
  *   - Parses the tool input with Zod as a final guarantee
  *   - Writes the raw output to memory/<kind>/<run_id>/<agent>.json
  *   - Appends an audit_log.jsonl line with token usage + cache stats
@@ -222,7 +225,8 @@ export async function dispatchAgent<T = unknown>(
     model: model.id,
     max_tokens: Math.min(model.max_tokens, 8192),
     system: systemBlocks as unknown as Anthropic.MessageCreateParams["system"],
-    tools: [{ ...tool, strict: true } as unknown as Anthropic.Tool],
+    // strict omitted — see header comment. Zod re-validates the result.
+    tools: [tool as unknown as Anthropic.Tool],
     tool_choice: { type: "tool", name: "emit_output" },
     messages: [{ role: "user", content: userMessage }],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
