@@ -119,7 +119,14 @@ function PendingCard({ p, onChanged }: { p: DashboardContextPending; onChanged: 
       >
         {c.tone === "expired" ? "timeout window expired" : `${c.text} left in 48 h window`}
       </div>
-      <div className="mt-3 grid grid-cols-3 gap-1">
+      <a
+        data-testid="sidebar-pending-review"
+        href={`/plan?run=${encodeURIComponent(p.run_id)}`}
+        className="mt-2 block rounded-md border border-amber-500/40 bg-amber-100 px-2 py-1 text-center text-[11px] font-semibold text-amber-900 transition hover:bg-amber-200"
+      >
+        Review full plan →
+      </a>
+      <div className="mt-2 grid grid-cols-3 gap-1">
         <button
           type="button"
           data-testid="sidebar-pending-approve"

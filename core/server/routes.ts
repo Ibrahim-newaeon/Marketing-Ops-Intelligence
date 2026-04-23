@@ -193,6 +193,51 @@ export function mountRoutes(app: Express): void {
     });
   });
 
+  // Per-agent artifact viewer. Reads memory/<kind>/<run_id>/<agent>.json
+  // where <kind> depends on the agent family. Also supports the pseudo
+  // agent "resolved_client" which lives under memory/context/<run_id>/.
+  const ARTIFACT_KIND: Record<string, string> = {
+    memory_retrieval_agent: "memory_context",
+    market_research_agent: "research",
+    competitor_intel_agent: "research",
+    audience_insights_agent: "research",
+    keyword_research_agent: "research",
+    strategy_planner_agent: "plans",
+    multi_market_allocator_agent: "plans",
+    budget_optimizer_agent: "plans",
+    approval_manager_agent: "approvals",
+    resolved_client: "context",
+  };
+  app.get("/api/pipeline/artifacts/:run_id/:agent", (req, res) => {
+    const { run_id: runId, agent } = req.params;
+    if (!/^[0-9a-f-]{36}$/i.test(runId)) {
+      return res.status(400).json({ ok: false, code: "invalid_run_id" });
+    }
+    const kind = ARTIFACT_KIND[agent];
+    if (!kind) {
+      return res.status(404).json({ ok: false, code: "unknown_agent" });
+    }
+    const full = path.join(MEMORY, kind, runId, `${agent}.json`);
+    if (!fs.existsSync(full)) {
+      return res.status(404).json({ ok: false, code: "artifact_not_found" });
+    }
+    try {
+      const raw = fs.readFileSync(full, "utf8");
+      const parsed = JSON.parse(raw);
+      const stat = fs.statSync(full);
+      res.json({
+        run_id: runId,
+        agent,
+        kind,
+        size_bytes: stat.size,
+        modified_at: new Date(stat.mtimeMs).toISOString(),
+        content: parsed,
+      });
+    } catch (err) {
+      res.status(500).json({ ok: false, code: "artifact_read_failed", detail: (err as Error).message });
+    }
+  });
+
   // ─── Approvals ─────────────────────────────────────────────────────
   app.get("/api/approvals/:run_id", (req, res) => {
     const s = readApprovalState();

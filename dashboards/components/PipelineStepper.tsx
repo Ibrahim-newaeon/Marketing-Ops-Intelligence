@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import {
   getPipelineProgress,
   type PipelineAgent,
@@ -165,8 +166,19 @@ export function PipelineStepper({ runId, onTerminal }: PipelineStepperProps): JS
           style={{ width: `${pct}%` }}
         />
       </div>
-      <div className="mt-1 text-[10px] text-muted-foreground" data-testid="pipeline-stepper-count">
-        {doneCount} of {total} agents · {pct}%
+      <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+        <span data-testid="pipeline-stepper-count">
+          {doneCount} of {total} agents · {pct}%
+        </span>
+        {doneCount > 0 && (
+          <Link
+            data-testid="pipeline-stepper-view-outputs"
+            href={`/plan?run=${encodeURIComponent(p.run_id)}`}
+            className="underline hover:text-foreground"
+          >
+            View outputs →
+          </Link>
+        )}
       </div>
 
       <ul

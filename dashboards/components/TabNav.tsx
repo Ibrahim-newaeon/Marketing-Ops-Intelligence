@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { slug: "overview",    label: "Overview" },
+  { slug: "plan",        label: "Plan" },
   { slug: "paid_media",  label: "Paid Media" },
   { slug: "seo",         label: "SEO" },
   { slug: "geo",         label: "GEO" },

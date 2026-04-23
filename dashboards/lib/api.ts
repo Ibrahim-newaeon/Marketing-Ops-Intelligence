@@ -162,6 +162,29 @@ export async function getPipelineProgress(runId: string): Promise<PipelineProgre
   }
 }
 
+export interface PipelineArtifact {
+  run_id: string;
+  agent: string;
+  kind: string;
+  size_bytes: number;
+  modified_at: string;
+  content: unknown;
+}
+
+export async function getPipelineArtifact(
+  runId: string,
+  agent: string
+): Promise<PipelineArtifact | null> {
+  try {
+    return await request<PipelineArtifact>(
+      `/api/pipeline/artifacts/${encodeURIComponent(runId)}/${encodeURIComponent(agent)}`
+    );
+  } catch (e) {
+    if (/\b404\b/.test((e as Error).message)) return null;
+    throw e;
+  }
+}
+
 export async function approveRun(run_id: string, plan_version?: string): Promise<unknown> {
   return request<unknown>(`/api/approvals/${encodeURIComponent(run_id)}/approve`, {
     method: "POST",
